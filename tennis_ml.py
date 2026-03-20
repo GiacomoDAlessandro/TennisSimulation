@@ -1,19 +1,14 @@
-"""
-    - Surface (clay, grass, hard)
-    - Player rankings
-    - Serve stats (ace rate, double fault rate, 1st serve %, win % on serve)
-    - Return stats (break points, return points won)
-
-Goal: Predict which player wins a match (1 = player 1 wins)
-"""
 
 import pandas as pd
 import numpy as np
+
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
+
+
 try:
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -21,6 +16,7 @@ except ModuleNotFoundError:
     plt = None
     sns = None
 import warnings
+
 warnings.filterwarnings('ignore')
 
 df = pd.read_csv('2025.csv')
@@ -58,7 +54,7 @@ def _finalize_profile(profile: pd.DataFrame, prefix: str, matches_col: str) -> p
     bp_faced = profile[f'{prefix}_bpFaced'].replace(0, np.nan)
     profile[f'{prefix}_bp_save_pct'] = profile[f'{prefix}_bpSaved'] / bp_faced
 
-    #per-match averages for count stats
+    # per-match averages for count stats
     m = profile[matches_col].replace(0, np.nan)
     for c in [f'{prefix}_ace', f'{prefix}_df', f'{prefix}_bpFaced', f'{prefix}_bpSaved']:
         profile[f'{c}_per_match'] = profile[c] / m
@@ -66,38 +62,30 @@ def _finalize_profile(profile: pd.DataFrame, prefix: str, matches_col: str) -> p
     return profile
 
 
-#winner player profiles
-player_profiles_w = df.groupby(['winner_id', 'winner_name'], dropna=False).agg(
-    matches_won=('surface', 'size'),
-    w_ace=('w_ace', 'sum'),
-    w_df=('w_df', 'sum'),
-    w_svpt=('w_svpt', 'sum'),
-    w_1stIn=('w_1stIn', 'sum'),
-    w_1stWon=('w_1stWon', 'sum'),
-    w_2ndWon=('w_2ndWon', 'sum'),
-    w_bpSaved=('w_bpSaved', 'sum'),
-    w_bpFaced=('w_bpFaced', 'sum'),
-).reset_index().rename(columns={'winner_id': 'player_id', 'winner_name': 'player_name'})
-player_profiles_w = _finalize_profile(player_profiles_w, prefix='w', matches_col='matches_won')
+def build_player_profiles(df):
+    player_profiles_w = df.groupby(['winner_id', 'winner_name'], dropna=False).agg(
+        matches_won=('surface', 'size'),
+        w_ace=('w_ace', 'sum'),
+        w_df=('w_df', 'sum'),
+        w_svpt=('w_svpt', 'sum'),
+        w_1stIn=('w_1stIn', 'sum'),
+        w_1stWon=('w_1stWon', 'sum'),
+        w_2ndWon=('w_2ndWon', 'sum'),
+        w_bpSaved=('w_bpSaved', 'sum'),
+        w_bpFaced=('w_bpFaced', 'sum'),
+    ).reset_index().rename(columns={'winner_id': 'player_id', 'winner_name': 'player_name'})
+    player_profiles_w = _finalize_profile(player_profiles_w, prefix='w', matches_col='matches_won')
 
-#Loser player profiles
-player_profiles_l = df.groupby(['loser_id', 'loser_name'], dropna=False).agg(
-    matches_lost=('surface', 'size'),
-    l_ace=('l_ace', 'sum'),
-    l_df=('l_df', 'sum'),
-    l_svpt=('l_svpt', 'sum'),
-    l_1stIn=('l_1stIn', 'sum'),
-    l_1stWon=('l_1stWon', 'sum'),
-    l_2ndWon=('l_2ndWon', 'sum'),
-    l_bpSaved=('l_bpSaved', 'sum'),
-    l_bpFaced=('l_bpFaced', 'sum'),
-).reset_index().rename(columns={'loser_id': 'player_id', 'loser_name': 'player_name'})
-player_profiles_l = _finalize_profile(player_profiles_l, prefix='l', matches_col='matches_lost')
-
-print('player_profiles_w:', player_profiles_w.shape)
-print('player_profiles_l:', player_profiles_l.shape)
-
-
-
-
-
+    # Loser player profiles
+    player_profiles_l = df.groupby(['loser_id', 'loser_name'], dropna=False).agg(
+        matches_lost=('surface', 'size'),
+        l_ace=('l_ace', 'sum'),
+        l_df=('l_df', 'sum'),
+        l_svpt=('l_svpt', 'sum'),
+        l_1stIn=('l_1stIn', 'sum'),
+        l_1stWon=('l_1stWon', 'sum'),
+        l_2ndWon=('l_2ndWon', 'sum'),
+        l_bpSaved=('l_bpSaved', 'sum'),
+        l_bpFaced=('l_bpFaced', 'sum'),
+    ).reset_index().rename(columns={'loser_id': 'player_id', 'loser_name': 'player_name'})
+    player_profiles_l = _finalize_profile(player_profiles_l, prefix='l', matches_col='matches_lost')
