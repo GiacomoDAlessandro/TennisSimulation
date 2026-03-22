@@ -249,6 +249,72 @@ class Point:
 def parse_shot_sequence(curr_points: Point) -> list[dict]:
     shots = []
 
+    counter = 0
+    for char in curr_points.first:
+        if counter == 0:
+
+        SHOT_TYPES = {
+            "f": "forehand",
+            "b": "backhand",
+            "r": "forehand slice",
+            "s": "backhand slice",
+            "v": "forehand volley",
+            "z": "backhand volley",
+            "o": "forehand overhead",
+            "p": "backhand overhead",
+            "u": "forehand drop shot",
+            "y": "backhand drop shot",
+            "l": "forehand lob",
+            "m": "backhand lob",
+            "t": "forehand trick shot",
+            "q": "backhand trick shot",
+            "h": "forehand half volley",
+            "i": "backhand half volley",
+            "j": "forehand swinging volley",
+            "k": "backhand swinging volley",
+        }
+
+        DIRECTIONS = {
+            "1": "Down the line", #Crosscourt for lefties
+            "2": "Crosscourt",
+            "3": "Middle of court",
+            "7": "Down the line(wide)",
+            "8": "Crosscourt(wide)",
+            "9": "Middle(wide)"
+        }
+
+        OUTCOMES = {
+            "*": "Ace",
+            "#": "Clean Winner",
+            "@": "Unforced error",
+            "!": "Forced error",
+            "n": "Net error",
+            "d": "Deep error",
+            "w": "Wide error",
+            "x": "Wide and net error",
+            "g": "General Error"
+        }
+
+        OTHER_SYMBOLS = {
+            "c": "Let serve",
+            ";": "Second bounce (Hawkeye Challenge)",
+            "^": "Player came to net",
+            "-": "Player retreated from net",
+            "=": "Shot landed on the line",
+            "Q": "Medical timeout called",
+            "S": "Serve went in but rally not charted",
+            "R": "Return not charted"
+        }
+
+
+        shots.append({
+            "type": SHOT_TYPES.get(char),
+            "direction":DIRECTIONS.get(char),
+            "outcome": OUTCOMES.get(char),
+            "other": OTHER_SYMBOLS.get(char)
+        })
+
+
 
 
     return shots
@@ -259,8 +325,8 @@ class Match:
         self.match_id = match_id
         self.points = []
         for _, row in group.iterrows():
-            point = Point(point)
-            self.points.append(points)
+            point = Point(row) # Changed 'point' to 'row'
+            self.points.append(point) # Changed 'points' to 'point'
         return
 
 #Matches Array
