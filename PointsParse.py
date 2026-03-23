@@ -202,8 +202,8 @@ rally_forced    : Points won because opponent made a forced error
 unforced        : Points LOST because this player made an unforced error
                   NOTE: this is errors made, not errors by opponent
 """
-
 import pandas as pd
+from db import supabase
 
 df = pd.read_csv('Data/charting-m-points-2020s.csv', low_memory=False)
 matches_df = pd.read_csv('Data/charting-m-matches.csv')
