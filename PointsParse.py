@@ -206,6 +206,8 @@ unforced        : Points LOST because this player made an unforced error
 import pandas as pd
 
 df = pd.read_csv('Data/charting-m-points-2020s.csv', low_memory=False)
+matches_df = pd.read_csv('Data/charting-m-matches.csv')
+match_info = matches_df.set_index('match_id')[['Surface', 'Tournament', 'Round']].to_dict('index')
 
 SERVE_DIRECTIONS = {
     "4": "wide",
@@ -297,7 +299,6 @@ class Point:
         self.first = row['1st']
         self.second = row['2nd']
         self.parsed_shots = None
-        return
 
     def get_shots(self):
         if self.parsed_shots is None:
@@ -352,10 +353,12 @@ class Match:
     def __init__(self, match_id, points):
         self.match_id = match_id
         self.points = []
+        self.tournament = match_info.get(match_id, {}).get('Tournament')
+        self.surface = match_info.get(match_id, {}).get('Surface')
+        self.round = match_info.get(match_id, {}).get('Round')
         for _, row in points.iterrows():
-            point = Point(row)  # Changed 'point' to 'row'
-            self.points.append(point)  # Changed 'points' to 'point'
-        return
+            point = Point(row)
+            self.points.append(point)
 
 
 matches = []
