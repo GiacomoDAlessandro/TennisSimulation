@@ -203,12 +203,11 @@ unforced        : Points LOST because this player made an unforced error
                   NOTE: this is errors made, not errors by opponent
 """
 import pandas as pd
-from db import supabase
 
-df = pd.read_csv('Data/charting-m-points-2020s.csv', low_memory=False)
-matches_df = pd.read_csv('Data/charting-m-matches.csv')
-match_info = matches_df.set_index('match_id')[['Surface', 'Tournament', 'Round']].to_dict('index')
-
+class MockPoint:
+    def __init__(self, first, second=None):
+        self.first = first
+        self.second = second
 SERVE_DIRECTIONS = {
     "4": "wide",
     "5": "body",
@@ -317,14 +316,14 @@ def parse_shot_sequence(curr_points: Point) -> list[dict]:
         sequence = curr_points.second
         miss = curr_points.first
         fault_outcome = OUTCOMES.get(miss[1]) if len(miss) > 1 else None
-        current_shot = {"type": "serve", "direction": SERVE_DIRECTIONS[miss[0]], "outcome": fault_outcome}
+        current_shot = {"type": "serve", "direction": SERVE_DIRECTIONS[miss[0]], "outcomes": fault_outcome}
         shots.append(current_shot)
 
     #Ace handling, if ace the data is simply (ex. 4*)
     if sequence[0] in SERVE_DIRECTIONS:
-        current_shot = {"type": "serve", "direction": SERVE_DIRECTIONS[sequence[0]], "outcome": None}
+        current_shot = {"type": "serve", "direction": SERVE_DIRECTIONS[sequence[0]], "outcomes": None}
         if len(sequence) > 1 and sequence[1] in OUTCOMES:
-            current_shot["outcome"] = OUTCOMES[sequence[1]]
+            current_shot["outcomes"] = OUTCOMES[sequence[1]]
             shots.append(current_shot)
             current_shot = {}
             sequence = sequence[2:]  #chop both serve direction and outcome
@@ -335,7 +334,7 @@ def parse_shot_sequence(curr_points: Point) -> list[dict]:
         if char in SHOT_TYPES:
             if current_shot:
                 shots.append(current_shot)
-            current_shot = {"type": SHOT_TYPES[char], "direction": None, "outcome": None}
+            current_shot = {"type": SHOT_TYPES[char], "direction": None, "outcomes": None}
         elif char in DIRECTIONS:
             current_shot["direction"] = DIRECTIONS[char]
         elif char in OUTCOMES:
@@ -359,11 +358,3 @@ class Match:
         for _, row in points.iterrows():
             point = Point(row)
             self.points.append(point)
-
-
-matches = []
- #Load all matches into array
-for match_id, group in df.groupby('match_id'):
-    group = group.sort_values('Pt')
-    match = Match(match_id, group)
-    matches.append(match)
