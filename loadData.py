@@ -1,10 +1,21 @@
 import pandas as pd
 from db import supabase
-import numpy as np
 import math
-from PointsParse import parse_shot_sequence, Point
-import json
 import time
+from PointsParse import SERVE_DIRECTIONS, SHOT_TYPES, OUTCOMES
+
+RETURN_DEPTHS = {
+    "7": "short",
+    "8": "mid",
+    "9": "deep"
+}
+
+SHOT_DIRECTIONS_MAP = {
+    "1": "forehand side",
+    "2": "middle",
+    "3": "backhand side",
+    "0": "unknown"
+}
 
 def clean(val):
     if isinstance(val, float) and math.isnan(val):

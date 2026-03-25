@@ -271,6 +271,10 @@ OTHER_SYMBOLS = {
     "R": "Return not charted"
 }
 
+RETURN_DEPTH = {
+
+}
+
 
 def get_players_from_match_id(match_id: str) -> tuple:
     # Splits match_id between '-'
