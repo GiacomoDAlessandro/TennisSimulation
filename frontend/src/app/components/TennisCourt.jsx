@@ -3,37 +3,39 @@ import {Line, Rect, Stage, Layer, Circle} from 'react-konva';
 
 export default function TennisCourt({surface = "hard"}) {
     const courtColors = {
-        hard: {court: "#4a90d9", lines: "#ffffff", posts:"#3f6b35"},
-        clay: {court: "#c8622a", lines: "#ffffff", posts:"#3f6b35"},
-        grass: {court: "#4a7c3f", lines: "#ffffff", posts:"#8B5A2B"},
+        hard: {court: "#4a90d9", lines: "#ffffff", posts:"#22331e", outArea:"#2e572d"},
+        clay: {court: "#c8622a", lines: "#ffffff", posts:"#3f6b35", outArea:"#c8622a"},
+        grass: {court: "#4a7c3f", lines: "#ffffff", posts:"#8B5A2B", outArea:"#4a7c3f"},
     }
 
     const colors = courtColors[surface.toLowerCase()]
     const courtLines = [
         //left singles line
-        [45, 0, 45, 780],
+        [90, 45, 90, 825],
         //right singles line
-        [315, 0, 315, 780],
+        [360, 45, 360, 825],
         //center service line
-        [180, 180, 180, 570],
+        [225, 225, 225, 615],
         //left doubles line
-        [0, 0, 0, 779],
+        [45, 45, 45, 825],
         //right doubles line
-        [780, 0, 360, 780],
+        [405, 45, 405, 825],
         //Near baseline
-        [0, 0, 360, 0],
+        [45, 45, 405, 45],
         //Far baseline
-        [0, 780, 360, 780],
+        [45, 825, 405, 825],
         //Far Service line
-        [45, 570, 315, 570],
+        [90, 615, 360, 615],
         //Near Service Line
-        [45, 180, 315, 180]
+        [90, 225, 360, 225]
     ]
 
     return (
-        <Stage width={360} height={780}>
+
+        <Stage width={450} height={870}>
             <Layer>
-                <Rect x={0} y={0} width={360} height={780}
+                <Rect x={0} y={0} width={450} height={870} fill={colors.outArea}/>
+                <Rect x={45} y={45} width={360} height={780}
                       fill={colors.court}/>
 
                 {/*Various out lines*/}
@@ -42,11 +44,11 @@ export default function TennisCourt({surface = "hard"}) {
                 ))}
 
                 {/*Net*/}
-                <Line  points={[0, 390, 360, 390]} stroke={colors.lines} strokeWidth={2} dash={[8,3]}/>
+                <Line  points={[45, 435, 405, 435]} stroke={colors.lines} strokeWidth={2} dash={[8,3]}/>
                 {/*Left post*/}
-                <Circle x={0} y={390} radius={5} fill={colors.posts}/>
+                <Circle x={45} y={435} radius={5} fill={colors.posts}/>
                 {/*Right Post*/}
-                <Circle x={360} y={390} radius={5} fill={colors.posts}/>
+                <Circle x={405} y={435} radius={5} fill={colors.posts}/>
             </Layer>
         </Stage>
     )
