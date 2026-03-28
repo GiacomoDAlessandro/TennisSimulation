@@ -1,7 +1,11 @@
+"use client";
 import React from 'react';
 import {Line, Rect, Stage, Layer, Circle} from 'react-konva';
 
-export default function TennisCourt({surface = "hard"}) {
+const STAGE_W = 450;
+const STAGE_H = 870;
+
+export default function TennisCourt({ surface = "hard", scale = 1 }) {
     const courtColors = {
         hard: {court: "#4a90d9", lines: "#ffffff", posts:"#22331e", outArea:"#2e572d"},
         clay: {court: "#c8622a", lines: "#ffffff", posts:"#3f6b35", outArea:"#c8622a"},
@@ -30,11 +34,12 @@ export default function TennisCourt({surface = "hard"}) {
         [90, 225, 360, 225]
     ]
 
-    return (
+    const s = Math.min(Math.max(scale, 0.2), 2);
 
-        <Stage width={450} height={870}>
-            <Layer>
-                <Rect x={0} y={0} width={450} height={870} fill={colors.outArea}/>
+    return (
+        <Stage width={STAGE_W * s} height={STAGE_H * s}>
+            <Layer scaleX={s} scaleY={s}>
+                <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} fill={colors.outArea}/>
                 <Rect x={45} y={45} width={360} height={780}
                       fill={colors.court}/>
 
