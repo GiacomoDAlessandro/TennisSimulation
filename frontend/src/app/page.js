@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Header from "./components/header.jsx";
+import UploadComingSoonButton from "./components/UploadComingSoonButton.jsx";
 
 export default function Home() {
   return (
@@ -14,12 +15,7 @@ export default function Home() {
             >
               View ATP Matches
             </Link>
-            <button
-              type="button"
-              className="h-11 w-full rounded-lg border border-zinc-200 bg-white text-sm font-medium text-zinc-800 shadow-sm transition-colors hover:bg-zinc-50"
-            >
-              Upload My Matches
-            </button>
+            <UploadComingSoonButton />
           </div>
         </div>
       </main>

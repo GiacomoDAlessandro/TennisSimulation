@@ -7,7 +7,8 @@ export default function MatchSimulatorPage() {
       <Header />
       <main className="flex flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-10">
         <div className="w-full max-w-[520px] rounded-2xl border border-zinc-200/90 flex justify-center items-center bg-white p-4 shadow-sm sm:p-6">
-            <TennisCourt surface="grass" fitViewport />
+            
+            <TennisCourt surface="hard" fitViewport />
         </div>
       </main>
     </div>
