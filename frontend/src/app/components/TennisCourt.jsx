@@ -5,15 +5,17 @@ import {Line, Rect, Stage, Layer, Circle, Group} from "react-konva";
 
 const COURT_W = 450;
 const COURT_H = 870;
-const SIDE_PAD = 88;
+const SIDE_PAD = 70;
 /** Extra out area past the right outer boundary */
-const RIGHT_OUT = 78;
+const RIGHT_OUT = 50;
 const STAGE_W = SIDE_PAD + COURT_W + RIGHT_OUT;
 const STAGE_H = COURT_H;
 
 const NET_Y = 435;
+//Right post size
 const POST_R = 5;
-const POST_GAP = 9;
+//Distance of umpire stand from net post
+const POST_GAP = 30;
 
 function BenchFacingCourt({x, y, sl}) {
     const w = 25;
