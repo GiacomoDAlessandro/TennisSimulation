@@ -18,6 +18,18 @@ app.add_middleware(
 def root():
     return {"status": "ok"}
 
+@app.get("/getAllPlayers")
+def get_players():
+    result = supabase.table('matches')\
+    .select('player1, player2').execute()
+
+    players = set()
+    for match in result.dad:
+        players.add(match['player1'])
+        players.add(match['player2'])
+    return {"players" : list(players)}
+
+
 @app.get("/player/{player_name}/serves")
 def get_player_serves(player_name: str, surface: str = None):
     result = supabase.table('matches')\

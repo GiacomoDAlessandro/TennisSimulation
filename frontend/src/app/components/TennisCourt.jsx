@@ -92,12 +92,13 @@ export default function TennisCourt({
             court: "#1d30a8",
             lines: "#ffffff",
             posts: "#22331e",
-            outArea: "#42713d",
+            outArea: "#30592f",
             sideLine: {
                 benchSeat: "#1e3a5f",
                 benchLeg: "#0f172a",
-                umpire: "#1b2c50",
+                umpire: "#0f172a",
                 towel: "#e2e8f0",
+                umpireAccent: "#0f172a"
             },
         },
         clay: {
@@ -221,6 +222,14 @@ export default function TennisCourt({
                             height={umpireH}
                             fill={sl.umpire}
                             cornerRadius={3}
+                        />
+                        <Rect
+                            x={3}
+                            y={5}
+                            width={28}
+                            height={26}
+                            fill={sl.umpireAccent}
+                            cornerRadius={2}
                         />
                     </Group>
                 </Group>
