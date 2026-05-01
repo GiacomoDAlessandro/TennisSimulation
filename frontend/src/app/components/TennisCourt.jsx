@@ -79,6 +79,9 @@ export default function TennisCourt({
                                         fitViewport = false,
                                         matchId = "",
                                         playerName ="",
+                                        pointTypeFilter = "serve",
+                                        serveOutcomeFilter = "all",
+                                        pressureFilter = "all",
                                     }) {
     const [mounted, setMounted] = useState(false);
     const [fitScale, setFitScale] = useState(0.72);
@@ -329,6 +332,9 @@ export default function TennisCourt({
                     playerName={playerName}
                     surface={surface}
                     onStatsChange={setServeStats}
+                    pointTypeFilter={pointTypeFilter}
+                    serveOutcomeFilter={serveOutcomeFilter}
+                    pressureFilter={pressureFilter}
                 />
             </Stage>
             <div className="relative flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-700">

@@ -4,8 +4,6 @@ import TennisCourt from "../components/TennisCourt";
 import {useState, useEffect, useMemo} from "react";
 import OnePlayerBox from "../components/onePlayerBox";
 import TwoPlayerBox from "../components/TwoPlayerBox";
-
-
 import {
     Combobox,
     ComboboxContent,
@@ -15,7 +13,6 @@ import {
     ComboboxList
 } from "../../components/ui/combobox";
 
-/** Label: "Tournament Round vs. opponent" (matches `matches` table from loadData.py). */
 function formatMatchDisplay(match, viewerName) {
     const tournament =
         (match.tournament && String(match.tournament).trim()) || "Unknown tournament";
@@ -35,6 +32,142 @@ function getTennisAbstractPlayerUrl(playerName) {
         .trim()
         .replace(/[\s-]+/g, "");
     return `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${encodeURIComponent(slug)}`;
+}
+
+function buildMatchOptions(matches, viewerName) {
+    if (!Array.isArray(matches)) return [];
+    return matches.map((match) => ({
+        label: formatMatchDisplay(match, viewerName),
+        value: String(match.match_id),
+    }));
+}
+
+const POINT_TYPE_OPTIONS = [
+    {label: "Serve", value: "serve"},
+    {label: "Return (coming soon)", value: "return"},
+];
+
+const SERVE_OUTCOME_OPTIONS = [
+    {label: "All serves", value: "all"},
+    {label: "Ace", value: "Ace"},
+    {label: "Unreturnable", value: "Unreturnable"},
+    {label: "In play", value: "in_play"},
+    {label: "Fault / error", value: "fault"},
+];
+
+const PRESSURE_OPTIONS = [
+    {label: "All points", value: "all"},
+    {label: "Pressure points only", value: "pressure_only"},
+    {label: "Non-pressure only", value: "non_pressure"},
+];
+
+function SelectionCombobox({
+    items,
+    value,
+    onValueChange,
+    placeholder,
+    className = "w-full min-w-0",
+    emptyText,
+    comboKey,
+}) {
+    return (
+        <Combobox key={comboKey} items={items} value={value} onValueChange={onValueChange}>
+            <ComboboxInput placeholder={placeholder} className={className}/>
+            <ComboboxContent>
+                {emptyText ? <ComboboxEmpty>{emptyText}</ComboboxEmpty> : null}
+                <ComboboxList>
+                    {(item) => (
+                        <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                        </ComboboxItem>
+                    )}
+                </ComboboxList>
+            </ComboboxContent>
+        </Combobox>
+    );
+}
+
+function FilterControls({
+    selectedPointTypeOption,
+    selectedServeOutcomeOption,
+    selectedPressureOption,
+    onPointTypeChange,
+    onServeOutcomeChange,
+    onPressureChange,
+    showServeOutcome,
+    className = "",
+}) {
+    return (
+        <div className={`grid w-full gap-2 ${className}`.trim()}>
+            <SelectionCombobox
+                items={POINT_TYPE_OPTIONS}
+                value={selectedPointTypeOption}
+                onValueChange={onPointTypeChange}
+                placeholder="Point type"
+            />
+            {showServeOutcome ? (
+                <SelectionCombobox
+                    items={SERVE_OUTCOME_OPTIONS}
+                    value={selectedServeOutcomeOption}
+                    onValueChange={onServeOutcomeChange}
+                    placeholder="Serve outcome"
+                />
+            ) : null}
+            <SelectionCombobox
+                items={PRESSURE_OPTIONS}
+                value={selectedPressureOption}
+                onValueChange={onPressureChange}
+                placeholder="Pressure points"
+            />
+        </div>
+    );
+}
+
+function PlayerPanel({
+    name,
+    surface,
+    matchOptions,
+    matchValue,
+    onMatchChange,
+    matchComboKey,
+    filtersNode,
+    pointTypeFilter,
+    serveOutcomeFilter,
+    pressureFilter,
+}) {
+    return (
+        <div className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <h3 className="mb-2 text-sm font-semibold text-zinc-800">
+                <a
+                    href={getTennisAbstractPlayerUrl(name)}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="hover:text-zinc-900"
+                >
+                    {name}
+                </a>
+            </h3>
+            <SelectionCombobox
+                comboKey={matchComboKey}
+                items={matchOptions}
+                value={matchValue}
+                onValueChange={onMatchChange}
+                placeholder="Select a match"
+                className="mb-2 w-full min-w-0"
+                emptyText="No matches found on this surface"
+            />
+            {matchValue ? filtersNode : null}
+            <TennisCourt
+                surface={surface}
+                playerName={name}
+                matchId={matchValue?.value}
+                courtScale={0.62}
+                pointTypeFilter={pointTypeFilter}
+                serveOutcomeFilter={serveOutcomeFilter}
+                pressureFilter={pressureFilter}
+            />
+        </div>
+    );
 }
 
 export default function MatchSimulatorPage() {
@@ -58,8 +191,10 @@ export default function MatchSimulatorPage() {
     const [selectedOnePlayerMatch, setSelectedOnePlayerMatch] = useState(null);
     const [selectedTwoPlayerMatchOne, setSelectedTwoPlayerMatchOne] = useState(null);
     const [selectedTwoPlayerMatchTwo, setSelectedTwoPlayerMatchTwo] = useState(null);
+    const [selectedPointType, setSelectedPointType] = useState("serve");
+    const [selectedServeOutcome, setSelectedServeOutcome] = useState("all");
+    const [selectedPressureFilter, setSelectedPressureFilter] = useState("all");
 
-    //Getting matches from supabase
     async function fetchPlayerMatches(playerName, surface, matchNum) {
         const encName = encodeURIComponent(playerName);
         const qs =
@@ -70,11 +205,7 @@ export default function MatchSimulatorPage() {
             `http://localhost:8000/getPlayerMatches/${encName}${qs}`
         );
         const data = await res.json();
-
-        //matches
         const matches = Array.isArray(data?.matches) ? data.matches : [];
-
-        //Initially match selected is every match until user selects a specific match
         if (matchNum === "One") {
             setSelectedMatchOne(matches);
         } else if (matchNum === "Two") {
@@ -85,22 +216,18 @@ export default function MatchSimulatorPage() {
 
     useEffect(() => {
         const saved = sessionStorage.getItem("devState");
-        if (saved) {
-            const s = JSON.parse(saved);
-            setClicked(s.clicked);
-            setOnePlayer(s.onePlayer);
-            setTennisCourt(s.tennisCourt);
-            setSelectedNameOne(s.selectedNameOne);
-            setSelectedSurfaceOne(s.selectedSurfaceOne);
-
-            if (s.selectedNameOne) {
-                fetchPlayerMatches(s.selectedNameOne, s.selectedSurfaceOne, "One");
-            }
-
+        if (!saved) return;
+        const s = JSON.parse(saved);
+        setClicked(s.clicked);
+        setOnePlayer(s.onePlayer);
+        setTennisCourt(s.tennisCourt);
+        setSelectedNameOne(s.selectedNameOne);
+        setSelectedSurfaceOne(s.selectedSurfaceOne);
+        if (s.selectedNameOne) {
+            fetchPlayerMatches(s.selectedNameOne, s.selectedSurfaceOne, "One");
         }
     }, []);
 
-    //Getting all players
     useEffect(() => {
         const CACHE_KEY = "tennis_players_cache_v1";
         const cached = window.sessionStorage.getItem(CACHE_KEY);
@@ -112,7 +239,6 @@ export default function MatchSimulatorPage() {
                     setPlayersLoading(false);
                 }
             } catch {
-                // ignore invalid cache and fetch fresh data
             }
         }
 
@@ -149,30 +275,69 @@ export default function MatchSimulatorPage() {
         setSelectedOnePlayerMatch(null);
     }, [selectedMatchOne]);
 
+    const matchOptionsOne = useMemo(
+        () => buildMatchOptions(selectedMatchOne, selectedNameOne),
+        [selectedMatchOne, selectedNameOne]
+    );
+    const matchOptionsTwo = useMemo(
+        () => buildMatchOptions(selectedMatchTwo, selectedNameTwo),
+        [selectedMatchTwo, selectedNameTwo]
+    );
 
-    const onePlayerMatchOptions = useMemo(() => {
-        if (!Array.isArray(selectedMatchOne)) return [];
-        return selectedMatchOne.map((m) => ({
-            label: formatMatchDisplay(m, selectedNameOne),
-            value: String(m.match_id),
-        }));
-    }, [selectedMatchOne, selectedNameOne]);
+    const selectedPointTypeOption =
+        POINT_TYPE_OPTIONS.find((o) => o.value === selectedPointType) ?? POINT_TYPE_OPTIONS[0];
+    const selectedServeOutcomeOption =
+        SERVE_OUTCOME_OPTIONS.find((o) => o.value === selectedServeOutcome) ?? SERVE_OUTCOME_OPTIONS[0];
+    const selectedPressureOption =
+        PRESSURE_OPTIONS.find((o) => o.value === selectedPressureFilter) ?? PRESSURE_OPTIONS[0];
 
-    const twoPlayerMatchOptionsOne = useMemo(() => {
-        if (!Array.isArray(selectedMatchOne)) return [];
-        return selectedMatchOne.map((m) => ({
-            label: formatMatchDisplay(m, selectedNameOne),
-            value: String(m.match_id),
-        }));
-    }, [selectedMatchOne, selectedNameOne]);
+    const showServeOutcome = selectedPointType === "serve";
 
-    const twoPlayerMatchOptionsTwo = useMemo(() => {
-        if (!Array.isArray(selectedMatchTwo)) return [];
-        return selectedMatchTwo.map((m) => ({
-            label: formatMatchDisplay(m, selectedNameTwo),
-            value: String(m.match_id),
-        }));
-    }, [selectedMatchTwo, selectedNameTwo]);
+    const onPointTypeChange = (val) => {
+        setSelectedPointType(val.value);
+        if (val.value !== "serve") setSelectedServeOutcome("all");
+    };
+
+    const resetFilters = () => {
+        setSelectedPointType("serve");
+        setSelectedServeOutcome("all");
+        setSelectedPressureFilter("all");
+    };
+
+    const resetView = () => {
+        setClicked(false);
+        setOnePlayer(false);
+        setTwoPlayers(false);
+        setTennisCourt(false);
+        setPlayerOne(null);
+        setPlayerTwo(null);
+        setQueryOne("");
+        setQueryTwo("");
+        setSelectedSurfaceOne(null);
+        setSelectedSurfaceTwo(null);
+        setSelectedNameOne("");
+        setSelectedNameTwo("");
+        setSelectedMatchOne([]);
+        setSelectedMatchTwo([]);
+        setSelectedOnePlayerMatch(null);
+        setSelectedTwoPlayerMatchOne(null);
+        setSelectedTwoPlayerMatchTwo(null);
+        resetFilters();
+    };
+
+    const sharedFiltersNode = (
+        <FilterControls
+            selectedPointTypeOption={selectedPointTypeOption}
+            selectedServeOutcomeOption={selectedServeOutcomeOption}
+            selectedPressureOption={selectedPressureOption}
+            onPointTypeChange={onPointTypeChange}
+            onServeOutcomeChange={(val) => setSelectedServeOutcome(val.value)}
+            onPressureChange={(val) => setSelectedPressureFilter(val.value)}
+            showServeOutcome={showServeOutcome}
+            className="mb-2"
+        />
+    );
+
     return (
         <div className="flex min-h-screen flex-col bg-zinc-100 text-zinc-900">
             <Header/>
@@ -186,7 +351,6 @@ export default function MatchSimulatorPage() {
                                 : "max-w-[520px]"
                     }`}>
                     {clicked && (
-                        //Button to go back from selecting players to selecting whether to view one player or two players*
                         <button
                             type="button"
                             aria-label={
@@ -199,23 +363,7 @@ export default function MatchSimulatorPage() {
                                     setSelectedOnePlayerMatch(null);
                                     return;
                                 }
-                                setClicked(false);
-                                setOnePlayer(false);
-                                setTwoPlayers(false);
-                                setTennisCourt(false);
-                                setPlayerOne(null);
-                                setPlayerTwo(null);
-                                setQueryOne("");
-                                setQueryTwo("");
-                                setSelectedSurfaceOne(null);
-                                setSelectedSurfaceTwo(null);
-                                setSelectedNameOne("");
-                                setSelectedNameTwo("");
-                                setSelectedMatchOne([]);
-                                setSelectedMatchTwo([]);
-                                setSelectedOnePlayerMatch(null);
-                                setSelectedTwoPlayerMatchOne(null);
-                                setSelectedTwoPlayerMatchTwo(null);
+                                resetView();
                             }}>
                             <span className="text-sm leading-none">←</span>
                         </button>
@@ -244,7 +392,6 @@ export default function MatchSimulatorPage() {
                             </div>
                         </div>
                     )}
-                    {/*When two players are viewed*/}
                     {twoPlayers && !tennisCourt && (
                         <TwoPlayerBox
                             players={players}
@@ -267,6 +414,7 @@ export default function MatchSimulatorPage() {
                                 fetchPlayerMatches(playerTwo, surfaceTwo, "Two");
                                 setSelectedTwoPlayerMatchOne(null);
                                 setSelectedTwoPlayerMatchTwo(null);
+                                resetFilters();
                                 setTennisCourt(true);
                             }}
                         />
@@ -274,92 +422,33 @@ export default function MatchSimulatorPage() {
 
                     {(twoPlayers && tennisCourt) && (
                         <div className="pt-6 grid w-full gap-5 md:grid-cols-2">
-                            <div
-                                className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                                <h3 className="mb-2 text-sm font-semibold text-zinc-800">
-                                    <a
-                                        href={getTennisAbstractPlayerUrl(selectedNameOne)}
-                                        target="_blank"
-                                        rel="noreferrer noopener"
-                                        className="hover:text-zinc-900"
-                                    >
-                                        {selectedNameOne}
-                                    </a>
-                                </h3>
-                                <Combobox
-                                    key={`${selectedNameOne}-${selectedSurfaceOne}-compare`}
-                                    items={twoPlayerMatchOptionsOne}
-                                    value={selectedTwoPlayerMatchOne}
-                                    onValueChange={setSelectedTwoPlayerMatchOne}>
-                                    <ComboboxInput
-                                        placeholder="Select a match"
-                                        className="mb-2 w-full min-w-0"
-                                    />
-                                    <ComboboxContent>
-                                        <ComboboxEmpty>
-                                            No matches found on this surface
-                                        </ComboboxEmpty>
-                                        <ComboboxList>
-                                            {(item) => (
-                                                <ComboboxItem key={item.value} value={item}>
-                                                    {item.label}
-                                                </ComboboxItem>
-                                            )}
-                                        </ComboboxList>
-                                    </ComboboxContent>
-                                </Combobox>
-                                <TennisCourt
-                                    surface={selectedSurfaceOne}
-                                    playerName={selectedNameOne}
-                                    matchId={selectedTwoPlayerMatchOne?.value}
-                                    courtScale={0.62}
-                                />
-                            </div>
-                            <div
-                                className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                                <h3 className="mb-2 text-sm font-semibold text-zinc-800">
-                                    <a
-                                        href={getTennisAbstractPlayerUrl(selectedNameTwo)}
-                                        target="_blank"
-                                        rel="noreferrer noopener"
-                                        className="hover:text-zinc-900"
-                                    >
-                                        {selectedNameTwo}
-                                    </a>
-                                </h3>
-                                <Combobox
-                                    key={`${selectedNameTwo}-${selectedSurfaceTwo}-compare`}
-                                    items={twoPlayerMatchOptionsTwo}
-                                    value={selectedTwoPlayerMatchTwo}
-                                    onValueChange={setSelectedTwoPlayerMatchTwo}>
-                                    <ComboboxInput
-                                        placeholder="Select a match"
-                                        className="mb-2 w-full min-w-0"
-                                    />
-                                    <ComboboxContent>
-                                        <ComboboxEmpty>
-                                            No matches found on this surface
-                                        </ComboboxEmpty>
-                                        <ComboboxList>
-                                            {(item) => (
-                                                <ComboboxItem key={item.value} value={item}>
-                                                    {item.label}
-                                                </ComboboxItem>
-                                            )}
-                                        </ComboboxList>
-                                    </ComboboxContent>
-                                </Combobox>
-                                <TennisCourt
-                                    surface={selectedSurfaceTwo}
-                                    playerName={selectedNameTwo}
-                                    matchId={selectedTwoPlayerMatchTwo?.value}
-                                    courtScale={0.62}
-                                />
-                            </div>
+                            <PlayerPanel
+                                name={selectedNameOne}
+                                surface={selectedSurfaceOne}
+                                matchOptions={matchOptionsOne}
+                                matchValue={selectedTwoPlayerMatchOne}
+                                onMatchChange={setSelectedTwoPlayerMatchOne}
+                                matchComboKey={`${selectedNameOne}-${selectedSurfaceOne}-compare`}
+                                filtersNode={sharedFiltersNode}
+                                pointTypeFilter={selectedPointType}
+                                serveOutcomeFilter={selectedServeOutcome}
+                                pressureFilter={selectedPressureFilter}
+                            />
+                            <PlayerPanel
+                                name={selectedNameTwo}
+                                surface={selectedSurfaceTwo}
+                                matchOptions={matchOptionsTwo}
+                                matchValue={selectedTwoPlayerMatchTwo}
+                                onMatchChange={setSelectedTwoPlayerMatchTwo}
+                                matchComboKey={`${selectedNameTwo}-${selectedSurfaceTwo}-compare`}
+                                filtersNode={sharedFiltersNode}
+                                pointTypeFilter={selectedPointType}
+                                serveOutcomeFilter={selectedServeOutcome}
+                                pressureFilter={selectedPressureFilter}
+                            />
                         </div>
                     )}
 
-                    {/*When only one player is viewed*/}
                     {onePlayer && !tennisCourt && (
                         <OnePlayerBox
                             players={players}
@@ -373,7 +462,8 @@ export default function MatchSimulatorPage() {
                                 setSelectedNameOne(playerOne);
                                 setSelectedSurfaceOne(surface);
                                 fetchPlayerMatches(playerOne, surface, "One");
-                                setTennisCourt(true)
+                                resetFilters();
+                                setTennisCourt(true);
                                 sessionStorage.setItem("devState", JSON.stringify({
                                     clicked: true,
                                     onePlayer: true,
@@ -386,31 +476,26 @@ export default function MatchSimulatorPage() {
                     )}
                     {onePlayer && tennisCourt && (
                         <div className="flex w-full max-w-[600px] flex-col gap-3 pt-10 pb-10">
-                            <Combobox
-                                key={`${selectedNameOne}-${selectedSurfaceOne}`}
-                                items={onePlayerMatchOptions}
+                            <SelectionCombobox
+                                comboKey={`${selectedNameOne}-${selectedSurfaceOne}`}
+                                items={matchOptionsOne}
                                 value={selectedOnePlayerMatch}
-                                onValueChange={(val) => {
-                                    console.log(val);
-                                    setSelectedOnePlayerMatch(val);
-                                }}>
-                                <ComboboxInput
-                                    placeholder="Select a match"
-                                    className="w-full min-w-0"
+                                onValueChange={setSelectedOnePlayerMatch}
+                                placeholder="Select a match"
+                                className="w-full min-w-0"
+                                emptyText="No matches found on this surface"
+                            />
+                            {selectedOnePlayerMatch && (
+                                <FilterControls
+                                    selectedPointTypeOption={selectedPointTypeOption}
+                                    selectedServeOutcomeOption={selectedServeOutcomeOption}
+                                    selectedPressureOption={selectedPressureOption}
+                                    onPointTypeChange={onPointTypeChange}
+                                    onServeOutcomeChange={(val) => setSelectedServeOutcome(val.value)}
+                                    onPressureChange={(val) => setSelectedPressureFilter(val.value)}
+                                    showServeOutcome={showServeOutcome}
                                 />
-                                <ComboboxContent>
-                                    <ComboboxEmpty>
-                                        No matches found on this surface
-                                    </ComboboxEmpty>
-                                    <ComboboxList>
-                                        {(item) => (
-                                            <ComboboxItem key={item.value} value={item}>
-                                                {item.label}
-                                            </ComboboxItem>
-                                        )}
-                                    </ComboboxList>
-                                </ComboboxContent>
-                            </Combobox>
+                            )}
                             <div
                                 className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                                 <h3 className="mb-2 text-sm font-semibold text-zinc-800">
@@ -423,12 +508,20 @@ export default function MatchSimulatorPage() {
                                         {selectedNameOne}
                                     </a>
                                 </h3>
-                                <TennisCourt surface={selectedSurfaceOne} playerName={selectedNameOne} matchId={selectedOnePlayerMatch?.value} courtScale={0.62}/>
+                                <TennisCourt
+                                    surface={selectedSurfaceOne}
+                                    playerName={selectedNameOne}
+                                    matchId={selectedOnePlayerMatch?.value}
+                                    courtScale={0.62}
+                                    pointTypeFilter={selectedPointType}
+                                    serveOutcomeFilter={selectedServeOutcome}
+                                    pressureFilter={selectedPressureFilter}
+                                />
                             </div>
                         </div>
                     )}
                 </div>
             </main>
         </div>
-    )
+    );
 }
