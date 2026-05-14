@@ -5,7 +5,7 @@ import {getServeCoordinates} from "../lib/courtUtils";
 
 
 function isGamePointScore(score) {
-    return score === "40-30" || score === "AD-40" || score === "30-40" || score === "40-AD";
+    return score === "40-30" || score === "AD-40" || score === "30-40" || score === "40-AD" || score === "15-30";
 }
 
 function isSetPointFromState(score, game1, game2) {
