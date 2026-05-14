@@ -2,6 +2,7 @@ import {SIDE_PAD} from "../lib/courtConstants";
 import {Layer, Circle, Label, Tag, Text} from "react-konva";
 import {useState, useEffect} from "react";
 import {getServeCoordinates} from "../lib/courtUtils";
+import {API_BASE} from "../../lib/api";
 
 
 function isGamePointScore(score) {
@@ -78,7 +79,7 @@ export default function ShotLayer({
 
     useEffect(() => {
         if (!matchId) return;
-        fetch(`http://localhost:8000/getPlayerServes/${matchId}/${playerName}`)
+        fetch(`${API_BASE}/getPlayerServes/${matchId}/${playerName}`)
             .then((res) => res.json())
             .then((data) => {
                 const points = Array.isArray(data?.points) ? data.points : [];

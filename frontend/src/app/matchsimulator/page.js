@@ -4,6 +4,7 @@ import TennisCourt from "../components/TennisCourt";
 import {useState, useEffect, useMemo} from "react";
 import OnePlayerBox from "../components/onePlayerBox";
 import TwoPlayerBox from "../components/TwoPlayerBox";
+import { API_BASE } from "../../lib/api";
 import {
     Combobox,
     ComboboxContent,
@@ -202,7 +203,7 @@ export default function MatchSimulatorPage() {
                 ? `?surface=${encodeURIComponent(surface)}`
                 : "";
         const res = await fetch(
-            `http://localhost:8000/getPlayerMatches/${encName}${qs}`
+            `${API_BASE}/getPlayerMatches/${encName}${qs}`
         );
         const data = await res.json();
         const matches = Array.isArray(data?.matches) ? data.matches : [];
@@ -242,7 +243,7 @@ export default function MatchSimulatorPage() {
             }
         }
 
-        fetch("http://localhost:8000/getAllPlayers")
+        fetch(`%${API_BASE}/getAllPlayers`)
             .then((res) => res.json())
             .then((data) => {
                 const nextPlayers = data.players ?? [];
