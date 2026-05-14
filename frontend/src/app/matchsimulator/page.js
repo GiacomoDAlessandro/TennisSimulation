@@ -243,7 +243,7 @@ export default function MatchSimulatorPage() {
             }
         }
 
-        fetch(`%${API_BASE}/getAllPlayers`)
+        fetch(`${API_BASE}/getAllPlayers`)
             .then((res) => res.json())
             .then((data) => {
                 const nextPlayers = data.players ?? [];
