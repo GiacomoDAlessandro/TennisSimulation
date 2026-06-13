@@ -69,53 +69,52 @@ export default function TwoPlayerBox({
                 Pick Two Players To Compare
             </header>
             <div className={"flex gap-3 w-full"}>
-                {/*Player One*/}
-                <Combobox
-                    items={playerOneOptions}
-                    value={playerOne}
-                    onValueChange={setPlayerOne}
-                    onInputValueChange={setQueryOne}
-                >
-                    <ComboboxInput
-                        placeholder={playersLoading ? "Loading players..." : "Select Player One"}
-                        disabled={playersLoading}
-                    />
-                    <ComboboxContent>
-                        <ComboboxList>
-                            {(item) => (
-                                <ComboboxItem key={item} value={item}>
-                                    {item}
-                                </ComboboxItem>
-                            )}
-                        </ComboboxList>
-                        <ComboboxEmpty>
-                            {playersLoading ? "Loading players..." : "No players found"}
-                        </ComboboxEmpty>
-                    </ComboboxContent>
-                </Combobox>
+                {/*Player One + Surface One*/}
+                <div className={"flex flex-col gap-3 flex-1 min-w-0"}>
+                    <Combobox
+                        items={playerOneOptions}
+                        value={playerOne}
+                        onValueChange={setPlayerOne}
+                        onInputValueChange={setQueryOne}
+                    >
+                        <ComboboxInput
+                            placeholder={playersLoading ? "Loading players..." : "Select Player One"}
+                            disabled={playersLoading}
+                        />
+                        <ComboboxContent>
+                            <ComboboxList>
+                                {(item) => (
+                                    <ComboboxItem key={item} value={item}>
+                                        {item}
+                                    </ComboboxItem>
+                                )}
+                            </ComboboxList>
+                            <ComboboxEmpty>
+                                {playersLoading ? "Loading players..." : "No players found"}
+                            </ComboboxEmpty>
+                        </ComboboxContent>
+                    </Combobox>
 
-                {/*Surface*/}
-                <Combobox
-                    items={surfaces}
-                    onValueChange={setSurfaceOne}>
-                    <ComboboxInput placeholder={"Select Surface"}/>
-                    <ComboboxContent>
-                        <ComboboxList>
-                            {(item) => (
-                                <ComboboxItem key={item} value={item}>
-                                    {item}
-                                </ComboboxItem>
-                            )}
-                        </ComboboxList>
-                        <ComboboxEmpty>Select a valid surface</ComboboxEmpty>
-                    </ComboboxContent>
-                </Combobox>
-            </div>
+                    <Combobox
+                        items={surfaces}
+                        onValueChange={setSurfaceOne}>
+                        <ComboboxInput placeholder={"Select Surface One"}/>
+                        <ComboboxContent>
+                            <ComboboxList>
+                                {(item) => (
+                                    <ComboboxItem key={item} value={item}>
+                                        {item}
 
-            {/*Player Two*/}
-            <div className={"flex flex-col gap-3 flex-1"}>
-                <div className={"flex gap-3 w-full"}>
+                                    </ComboboxItem>
+                                )}
+                            </ComboboxList>
+                            <ComboboxEmpty>Select a valid surface</ComboboxEmpty>
+                        </ComboboxContent>
+                    </Combobox>
+                </div>
 
+                {/*Player Two + Surface Two*/}
+                <div className={"flex flex-col gap-3 flex-1 min-w-0"}>
                     <Combobox
                         items={playerTwoOptions}
                         value={playerTwo}
@@ -140,12 +139,11 @@ export default function TwoPlayerBox({
                         </ComboboxContent>
                     </Combobox>
 
-                    {/*Surface*/}
                     <Combobox
                         items={surfaces}
                         onValueChange={setSurfaceTwo}
                     >
-                        <ComboboxInput placeholder={"Select Surface"}/>
+                        <ComboboxInput placeholder={"Select Surface Two"}/>
                         <ComboboxContent>
                             <ComboboxList>
                                 {(item) => (
