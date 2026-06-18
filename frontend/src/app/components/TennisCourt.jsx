@@ -2,7 +2,9 @@
 import { COURT_W, COURT_H, SIDE_PAD } from "../lib/courtConstants";
 import React, {useEffect, useState} from "react";
 import {Line, Rect, Stage, Layer, Circle, Group} from "react-konva";
+import {ChartLineIcon} from "@phosphor-icons/react";
 import ShotLayer from './ShotLayer'
+import ServeAnalyticsModal from "./ServeAnalyticsModal";
 import {SERVE_COLORS} from "../lib/courtUtils";
 
 /** Extra out area past the right outer boundary */
@@ -92,6 +94,7 @@ export default function TennisCourt({
         faults: 0,
     });
     const [legendHover, setLegendHover] = useState(null);
+    const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -223,8 +226,21 @@ export default function TennisCourt({
     const nearBenchY = umpireY + umpireH + benchGap;
     const benchX = umpireX;
 
+    const showAnalytics = Boolean(matchId && playerName);
+
     return (
-        <div className="flex flex-col items-center gap-2">
+        <div className="relative flex flex-col items-center gap-2">
+            {showAnalytics && (
+                <button
+                    type="button"
+                    onClick={() => setAnalyticsOpen(true)}
+                    className="absolute right-0 top-0 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                    aria-label="Open serve analytics"
+                    title="Serve analytics"
+                >
+                    <ChartLineIcon size={16} weight="bold"/>
+                </button>
+            )}
             <Stage width={STAGE_W * s} height={STAGE_H * s}>
                 <Layer scaleX={s} scaleY={s}>
                 <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} fill={colors.outArea}/>
@@ -376,6 +392,12 @@ export default function TennisCourt({
                     </div>
                 )}
             </div>
+            <ServeAnalyticsModal
+                open={analyticsOpen}
+                onClose={() => setAnalyticsOpen(false)}
+                matchId={matchId}
+                playerName={playerName}
+            />
         </div>
     );
 }

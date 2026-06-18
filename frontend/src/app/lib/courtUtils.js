@@ -1,5 +1,5 @@
 //These sides are where the server serves from
-function getAD_DEUCE(score) {
+export function getServeSide(score) {
     if (!score) return "D";
 
     if (SCORE_TO_SIDE[score]) return SCORE_TO_SIDE[score];
@@ -100,7 +100,7 @@ const jitter = (range) => (Math.random() - 0.5) * range;
 
 export function getServeCoordinates(score, first_direction, first_outcome, second_direction,
                                     second_outcome, had_fault, surface) {
-    const side = getAD_DEUCE(score);
+    const side = getServeSide(score);
     const shots = [];
 
     surface = surface?.toLowerCase();
