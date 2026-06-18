@@ -2,7 +2,7 @@
 import { COURT_W, COURT_H, SIDE_PAD } from "../lib/courtConstants";
 import React, {useEffect, useState} from "react";
 import {Line, Rect, Stage, Layer, Circle, Group} from "react-konva";
-import {ChartLineIcon} from "@phosphor-icons/react";
+import {ChartBarIcon} from "@phosphor-icons/react";
 import ShotLayer from './ShotLayer'
 import ServeAnalyticsModal from "./ServeAnalyticsModal";
 import {SERVE_COLORS} from "../lib/courtUtils";
@@ -234,11 +234,11 @@ export default function TennisCourt({
                 <button
                     type="button"
                     onClick={() => setAnalyticsOpen(true)}
-                    className="absolute right-0 top-0 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                    className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-md text-zinc-500/45 transition-colors hover:bg-white/20 hover:text-zinc-700/80"
                     aria-label="Open serve analytics"
                     title="Serve analytics"
                 >
-                    <ChartLineIcon size={16} weight="bold"/>
+                    <ChartBarIcon size={18} weight="regular" color={"white"}/>
                 </button>
             )}
             <Stage width={STAGE_W * s} height={STAGE_H * s}>
