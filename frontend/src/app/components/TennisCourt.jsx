@@ -4,6 +4,7 @@ import React, {useEffect, useState} from "react";
 import {Line, Rect, Stage, Layer, Circle, Group} from "react-konva";
 import {ChartBarIcon} from "@phosphor-icons/react";
 import ShotLayer from './ShotLayer'
+import ServeHeatmapLayer from "./ServeHeatmapLayer";
 import ServeAnalyticsModal from "./ServeAnalyticsModal";
 import {SERVE_COLORS} from "../lib/courtUtils";
 
@@ -81,6 +82,8 @@ export default function TennisCourt({
                                         fitViewport = false,
                                         matchId = "",
                                         playerName ="",
+                                        points = null,
+                                        viewMode = "scatter",
                                         pointTypeFilter = "serve",
                                         serveOutcomeFilter = "all",
                                         pressureFilter = "all",
@@ -226,7 +229,20 @@ export default function TennisCourt({
     const nearBenchY = umpireY + umpireH + benchGap;
     const benchX = umpireX;
 
-    const showAnalytics = Boolean(matchId && playerName);
+    const hasBulkPoints = Array.isArray(points);
+    const showAnalytics = Boolean(playerName && (matchId || (hasBulkPoints && points.length > 0)));
+    const stageW = STAGE_W * s;
+    const stageH = STAGE_H * s;
+    const sharedShotProps = {
+        matchId,
+        playerName,
+        surface,
+        points,
+        onStatsChange: setServeStats,
+        pointTypeFilter,
+        serveOutcomeFilter,
+        pressureFilter,
+    };
 
     return (
         <div className="relative flex flex-col items-center gap-2">
@@ -241,152 +257,161 @@ export default function TennisCourt({
                     <ChartBarIcon size={18} weight="regular" color={"white"}/>
                 </button>
             )}
-            <Stage width={STAGE_W * s} height={STAGE_H * s}>
-                <Layer scaleX={s} scaleY={s}>
-                <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} fill={colors.outArea}/>
-                {surface.toLowerCase() === "grass" &&
-                    Array.from({length: Math.ceil(STAGE_W / GRASS_STRIPE_W)}).map((_, i) => {
-                        const stripeX = i * GRASS_STRIPE_W;
-                        const stripeW = Math.min(GRASS_STRIPE_W, STAGE_W - stripeX);
-                        return (
-                            <Rect
-                                key={`grass-strip-${i}`}
-                                x={stripeX}
-                                y={0}
-                                width={stripeW}
-                                height={STAGE_H}
-                                fill={i % 2 === 0 ? "#5f934f" : "#3f6f36"}
-                                opacity={GRASS_STRIPE_OPACITY}
-                            />
-                        );
-                    })}
-
-                <Group x={SIDE_PAD}>
-                    <Rect x={0} y={0} width={COURT_W} height={COURT_H} fill={colors.outArea}/>
-                    <Rect
-                        x={courtX(COURT_INNER_X_PCT)}
-                        y={courtY(COURT_INNER_Y_PCT)}
-                        width={courtX(COURT_INNER_W_PCT)}
-                        height={courtY(COURT_INNER_H_PCT)}
-                        fill={colors.court}
-                    />
+            <div className="relative" style={{width: stageW, height: stageH}}>
+                <Stage width={stageW} height={stageH}>
+                    <Layer scaleX={s} scaleY={s}>
+                    <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} fill={colors.outArea}/>
                     {surface.toLowerCase() === "grass" &&
-                        Array.from({length: GRASS_STRIPE_COUNT}).map((_, i) => {
+                        Array.from({length: Math.ceil(STAGE_W / GRASS_STRIPE_W)}).map((_, i) => {
+                            const stripeX = i * GRASS_STRIPE_W;
+                            const stripeW = Math.min(GRASS_STRIPE_W, STAGE_W - stripeX);
                             return (
                                 <Rect
-                                    key={`grass-court-strip-${i}`}
-                                    x={i * GRASS_STRIPE_W}
+                                    key={`grass-strip-${i}`}
+                                    x={stripeX}
                                     y={0}
-                                    width={GRASS_STRIPE_W}
-                                    height={COURT_H}
+                                    width={stripeW}
+                                    height={STAGE_H}
                                     fill={i % 2 === 0 ? "#5f934f" : "#3f6f36"}
-                                    opacity={0.4}
+                                    opacity={GRASS_STRIPE_OPACITY}
                                 />
                             );
                         })}
 
-                    {/*Various out lines*/}
-                    {courtLines.map((points, i) => (
-                        <Line key={i} points={points} stroke={colors.lines} strokeWidth={2}/>
-                    ))}
-
-                    {/*Net*/}
-                    <Line
-                        points={[
-                            courtX(DOUBLES_LEFT_X_PCT),
-                            courtY(NET_Y_PCT),
-                            courtX(DOUBLES_RIGHT_X_PCT),
-                            courtY(NET_Y_PCT),
-                        ]}
-                        stroke={colors.lines}
-                        strokeWidth={2}
-                        dash={[8, 3]}
-                    />
-                    {/*Left post*/}
-                    <Circle
-                        x={courtX(DOUBLES_LEFT_X_PCT)}
-                        y={courtY(NET_Y_PCT)}
-                        radius={courtX(POST_R_PCT)}
-                        fill={colors.posts}
-                    />
-                    {/*Right Post*/}
-                    <Circle
-                        x={courtX(DOUBLES_RIGHT_X_PCT)}
-                        y={courtY(NET_Y_PCT)}
-                        radius={courtX(POST_R_PCT)}
-                        fill={colors.posts}
-                    />
-                </Group>
-
-                <Group>
-                    <BenchFacingCourt x={benchX} y={farBenchY} sl={sl}/>
-                    <BenchFacingCourt x={benchX} y={nearBenchY} sl={sl}/>
-
-                    <Group x={umpireX} y={umpireY}>
+                    <Group x={SIDE_PAD}>
+                        <Rect x={0} y={0} width={COURT_W} height={COURT_H} fill={colors.outArea}/>
                         <Rect
-                            x={0}
-                            y={0}
-                            width={umpireW}
-                            height={umpireH}
-                            fill={sl.umpire}
-                            cornerRadius={3}
+                            x={courtX(COURT_INNER_X_PCT)}
+                            y={courtY(COURT_INNER_Y_PCT)}
+                            width={courtX(COURT_INNER_W_PCT)}
+                            height={courtY(COURT_INNER_H_PCT)}
+                            fill={colors.court}
                         />
-                        <Rect
-                            x={courtX(UMP_INNER_X_PCT)}
-                            y={courtY(UMP_INNER_Y_PCT)}
-                            width={courtX(UMP_INNER_W_PCT)}
-                            height={courtY(UMP_INNER_H_PCT)}
-                            fill={sl.umpireAccent}
-                            cornerRadius={2}
+                        {surface.toLowerCase() === "grass" &&
+                            Array.from({length: GRASS_STRIPE_COUNT}).map((_, i) => {
+                                return (
+                                    <Rect
+                                        key={`grass-court-strip-${i}`}
+                                        x={i * GRASS_STRIPE_W}
+                                        y={0}
+                                        width={GRASS_STRIPE_W}
+                                        height={COURT_H}
+                                        fill={i % 2 === 0 ? "#5f934f" : "#3f6f36"}
+                                        opacity={0.4}
+                                    />
+                                );
+                            })}
+
+                        {/*Various out lines*/}
+                        {courtLines.map((linePoints, i) => (
+                            <Line key={i} points={linePoints} stroke={colors.lines} strokeWidth={2}/>
+                        ))}
+
+                        {/*Net*/}
+                        <Line
+                            points={[
+                                courtX(DOUBLES_LEFT_X_PCT),
+                                courtY(NET_Y_PCT),
+                                courtX(DOUBLES_RIGHT_X_PCT),
+                                courtY(NET_Y_PCT),
+                            ]}
+                            stroke={colors.lines}
+                            strokeWidth={2}
+                            dash={[8, 3]}
+                        />
+                        {/*Left post*/}
+                        <Circle
+                            x={courtX(DOUBLES_LEFT_X_PCT)}
+                            y={courtY(NET_Y_PCT)}
+                            radius={courtX(POST_R_PCT)}
+                            fill={colors.posts}
+                        />
+                        {/*Right Post*/}
+                        <Circle
+                            x={courtX(DOUBLES_RIGHT_X_PCT)}
+                            y={courtY(NET_Y_PCT)}
+                            radius={courtX(POST_R_PCT)}
+                            fill={colors.posts}
                         />
                     </Group>
-                </Group>
-                </Layer>
-                <ShotLayer
-                    s={s}
-                    matchId={matchId}
-                    playerName={playerName}
-                    surface={surface}
-                    onStatsChange={setServeStats}
-                    pointTypeFilter={pointTypeFilter}
-                    serveOutcomeFilter={serveOutcomeFilter}
-                    pressureFilter={pressureFilter}
-                />
-            </Stage>
+
+                    <Group>
+                        <BenchFacingCourt x={benchX} y={farBenchY} sl={sl}/>
+                        <BenchFacingCourt x={benchX} y={nearBenchY} sl={sl}/>
+
+                        <Group x={umpireX} y={umpireY}>
+                            <Rect
+                                x={0}
+                                y={0}
+                                width={umpireW}
+                                height={umpireH}
+                                fill={sl.umpire}
+                                cornerRadius={3}
+                            />
+                            <Rect
+                                x={courtX(UMP_INNER_X_PCT)}
+                                y={courtY(UMP_INNER_Y_PCT)}
+                                width={courtX(UMP_INNER_W_PCT)}
+                                height={courtY(UMP_INNER_H_PCT)}
+                                fill={sl.umpireAccent}
+                                cornerRadius={2}
+                            />
+                        </Group>
+                    </Group>
+                    </Layer>
+                    {viewMode === "scatter" && (
+                        <ShotLayer s={s} {...sharedShotProps} />
+                    )}
+                </Stage>
+                {viewMode === "heatmap" && (
+                    <ServeHeatmapLayer
+                        width={stageW}
+                        height={stageH}
+                        scale={s}
+                        {...sharedShotProps}
+                    />
+                )}
+            </div>
             <div className="relative flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-700">
-                <span
-                    className="inline-flex items-center gap-1"
-                    onMouseEnter={() => setLegendHover({label: "Aces", value: serveStats.aces})}
-                    onMouseLeave={() => setLegendHover(null)}
-                >
-                    <span className="h-2.5 w-2.5 rounded-full border border-zinc-400" style={{backgroundColor: legendColors.Ace}}/>
-                    Ace
-                </span>
-                <span
-                    className="inline-flex items-center gap-1"
-                    onMouseEnter={() => setLegendHover({label: "Unreturnables", value: serveStats.unreturnables})}
-                    onMouseLeave={() => setLegendHover(null)}
-                >
-                    <span className="h-2.5 w-2.5 rounded-full border border-zinc-400" style={{backgroundColor: legendColors.Unreturnable}}/>
-                    Unreturnable
-                </span>
-                <span
-                    className="inline-flex items-center gap-1"
-                    onMouseEnter={() => setLegendHover({label: "In play", value: serveStats.inPlay})}
-                    onMouseLeave={() => setLegendHover(null)}
-                >
-                    <span className="h-2.5 w-2.5 rounded-full border border-zinc-400" style={{backgroundColor: legendColors.in_play}}/>
-                    In play
-                </span>
-                <span
-                    className="inline-flex items-center gap-1"
-                    onMouseEnter={() => setLegendHover({label: "Faults / errors", value: serveStats.faults})}
-                    onMouseLeave={() => setLegendHover(null)}
-                >
-                    <span className="h-2.5 w-2.5 rounded-full border border-zinc-400 bg-red-500"/>
-                    Fault / error
-                </span>
-                {legendHover && (
+                {viewMode === "scatter" ? (
+                    <>
+                        <span
+                            className="inline-flex items-center gap-1"
+                            onMouseEnter={() => setLegendHover({label: "Aces", value: serveStats.aces})}
+                            onMouseLeave={() => setLegendHover(null)}
+                        >
+                            <span className="h-2.5 w-2.5 rounded-full border border-zinc-400" style={{backgroundColor: legendColors.Ace}}/>
+                            Ace
+                        </span>
+                        <span
+                            className="inline-flex items-center gap-1"
+                            onMouseEnter={() => setLegendHover({label: "Unreturnables", value: serveStats.unreturnables})}
+                            onMouseLeave={() => setLegendHover(null)}
+                        >
+                            <span className="h-2.5 w-2.5 rounded-full border border-zinc-400" style={{backgroundColor: legendColors.Unreturnable}}/>
+                            Unreturnable
+                        </span>
+                        <span
+                            className="inline-flex items-center gap-1"
+                            onMouseEnter={() => setLegendHover({label: "In play", value: serveStats.inPlay})}
+                            onMouseLeave={() => setLegendHover(null)}
+                        >
+                            <span className="h-2.5 w-2.5 rounded-full border border-zinc-400" style={{backgroundColor: legendColors.in_play}}/>
+                            In play
+                        </span>
+                        <span
+                            className="inline-flex items-center gap-1"
+                            onMouseEnter={() => setLegendHover({label: "Faults / errors", value: serveStats.faults})}
+                            onMouseLeave={() => setLegendHover(null)}
+                        >
+                            <span className="h-2.5 w-2.5 rounded-full border border-zinc-400 bg-red-500"/>
+                            Fault / error
+                        </span>
+                    </>
+                ) : (
+                    <span className="text-zinc-500">Heatmap · denser zones = more serves</span>
+                )}
+                {legendHover && viewMode === "scatter" && (
                     <div className="pointer-events-none absolute -top-9 rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-zinc-100 shadow-md">
                         {legendHover.label}: {legendHover.value}
                     </div>
@@ -397,6 +422,8 @@ export default function TennisCourt({
                 onClose={() => setAnalyticsOpen(false)}
                 matchId={matchId}
                 playerName={playerName}
+                surface={surface}
+                points={hasBulkPoints ? points : null}
             />
         </div>
     );

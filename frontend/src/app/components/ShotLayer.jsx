@@ -1,161 +1,70 @@
-import {SIDE_PAD} from "../lib/courtConstants";
 import {Layer, Circle, Label, Tag, Text} from "react-konva";
-import {useState, useEffect} from "react";
-import {getServeCoordinates} from "../lib/courtUtils";
+import {useState, useEffect, useMemo} from "react";
+import {SIDE_PAD} from "../lib/courtConstants";
 import {API_BASE} from "../../lib/api";
-
-
-function isGamePointScore(score) {
-    return score === "40-30" || score === "AD-40" || score === "30-40" || score === "40-AD" || score === "15-30";
-}
-
-function isSetPointFromState(score, game1, game2) {
-    if (!isGamePointScore(score)) return false;
-    const g1 = Number(game1);
-    const g2 = Number(game2);
-    if (!Number.isFinite(g1) || !Number.isFinite(g2)) return false;
-
-    const p1GamePoint = score === "40-30" || score === "AD-40";
-    const p2GamePoint = score === "30-40" || score === "40-AD";
-
-    // Set point in standard 6-game sets if the player can win this game to reach 6 with 2-game lead.
-    if (p1GamePoint) {
-        const nextG1 = g1 + 1;
-        return nextG1 >= 6 && (nextG1 - g2) >= 2;
-    }
-    if (p2GamePoint) {
-        const nextG2 = g2 + 1;
-        return nextG2 >= 6 && (nextG2 - g1) >= 2;
-    }
-    return false;
-}
-
-function parseNumericScore(score) {
-    const parts = String(score || "").split("-");
-    if (parts.length !== 2) return null;
-    const a = Number(parts[0]);
-    const b = Number(parts[1]);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-    return [a, b];
-}
-
-function isTiebreakPoint(point) {
-    const numeric = parseNumericScore(point?.score);
-    if (!numeric) return false;
-    const g1 = Number(point?.game1);
-    const g2 = Number(point?.game2);
-    return (g1 === 6 && g2 === 6) || (g1 === 3 && g2 === 3);
-}
-
-function getTiebreakGroupKey(point) {
-    return `${point?.match_id ?? ""}:${point?.set1 ?? "?"}-${point?.set2 ?? "?"}:${point?.game1 ?? "?"}-${point?.game2 ?? "?"}`;
-}
-
-function isTiebreakPressurePoint(score, tiebreakTarget) {
-    const parsed = parseNumericScore(score);
-    if (!parsed) return false;
-    const [p1, p2] = parsed;
-    const diff = Math.abs(p1 - p2);
-
-    const isSetPointNow =
-        (p1 >= tiebreakTarget - 1 && (p1 - p2) >= 1) ||
-        (p2 >= tiebreakTarget - 1 && (p2 - p1) >= 1);
-
-    return isSetPointNow && diff <= 3;
-}
+import {
+    countServeOutcomes,
+    filterServeShots,
+    pointsToServeShots,
+} from "../lib/serveShots";
 
 export default function ShotLayer({
     s,
     matchId,
     playerName,
     surface,
+    points = null,
     onStatsChange,
     pointTypeFilter = "serve",
     serveOutcomeFilter = "all",
     pressureFilter = "all",
 }) {
-    const [shots, setShots] = useState([]);
+    const [fetchedShots, setFetchedShots] = useState([]);
     const [hoveredShot, setHoveredShot] = useState(null);
 
+    // When parent supplies aggregated points, skip the single-match fetch.
     useEffect(() => {
-        if (!matchId) return;
+        if (points != null) return;
+        if (!matchId) {
+            setFetchedShots([]);
+            return;
+        }
+
+        let cancelled = false;
         fetch(`${API_BASE}/getPlayerServes/${matchId}/${playerName}`)
             .then((res) => res.json())
             .then((data) => {
-                const points = Array.isArray(data?.points) ? data.points : [];
-                const tiebreakMaxByGroup = new Map();
-
-                for (const point of points) {
-                    if (!isTiebreakPoint(point)) continue;
-                    const parsed = parseNumericScore(point.score);
-                    if (!parsed) continue;
-                    const key = getTiebreakGroupKey(point);
-                    const maxScore = Math.max(parsed[0], parsed[1]);
-                    const prev = tiebreakMaxByGroup.get(key) ?? 0;
-                    tiebreakMaxByGroup.set(key, Math.max(prev, maxScore));
-                }
-
-                const nextShots = points.flatMap((point) =>
-                    getServeCoordinates(
-                        point.score,
-                        point.first_serve_direction,
-                        point.first_serve_outcome,
-                        point.second_serve_direction,
-                        point.second_serve_outcome,
-                        point.had_fault,
-                        surface
-                    ).map((shot) => {
-                        const isGamePoint = isGamePointScore(point.score);
-                        const isSetPoint = isSetPointFromState(point.score, point.game1, point.game2);
-                        const isTiebreak = isTiebreakPoint(point);
-                        const tiebreakGroupKey = getTiebreakGroupKey(point);
-                        const tiebreakObservedMax = tiebreakMaxByGroup.get(tiebreakGroupKey) ?? 0;
-                        const tiebreakTarget = tiebreakObservedMax >= 10 ? 10 : 7;
-                        const isTiebreakPressure = isTiebreak
-                            ? isTiebreakPressurePoint(point.score, tiebreakTarget)
-                            : false;
-                        return {
-                            ...shot,
-                            gameScore: `${point.game1 ?? "?"}-${point.game2 ?? "?"}`,
-                            setScore: `${point.set1 ?? "?"}-${point.set2 ?? "?"}`,
-                            isGamePoint,
-                            isSetPoint,
-                            isPressurePoint: isGamePoint || isSetPoint || isTiebreakPressure,
-                        };
-                    })
-                ).filter((shot) => shot !== null);
-                setShots(nextShots);
+                if (cancelled) return;
+                const nextPoints = Array.isArray(data?.points) ? data.points : [];
+                setFetchedShots(pointsToServeShots(nextPoints, surface));
             })
-    }, [matchId, playerName, surface]);
+            .catch(() => {
+                if (!cancelled) setFetchedShots([]);
+            });
 
-    const filteredShots = shots.filter((shot) => {
-        if (pointTypeFilter === "return") {
-            // Return filtering is intentionally not active yet.
-            return false;
+        return () => {
+            cancelled = true;
+        };
+    }, [points, matchId, playerName, surface]);
+
+    const shots = useMemo(() => {
+        if (points != null) {
+            return pointsToServeShots(points, surface);
         }
+        return fetchedShots;
+    }, [points, surface, fetchedShots]);
 
-        if (serveOutcomeFilter !== "all") {
-            if (serveOutcomeFilter === "fault") {
-                if (shot.color !== "red") return false;
-            } else if (shot.outcome !== serveOutcomeFilter) {
-                return false;
-            }
-        }
+    const filteredShots = useMemo(
+        () =>
+            filterServeShots(shots, {
+                pointTypeFilter,
+                serveOutcomeFilter,
+                pressureFilter,
+            }),
+        [shots, pointTypeFilter, serveOutcomeFilter, pressureFilter]
+    );
 
-        if (pressureFilter === "pressure_only" && !shot.isPressurePoint) return false;
-        if (pressureFilter === "non_pressure" && shot.isPressurePoint) return false;
-
-        return true;
-    });
-
-    const counts = filteredShots.reduce((acc, shot) => {
-        const outcome = shot.outcome;
-        if (outcome === "Ace") acc.aces += 1;
-        else if (outcome === "Unreturnable") acc.unreturnables += 1;
-        else if (outcome === "in_play") acc.inPlay += 1;
-        else if (shot.color === "red") acc.faults += 1;
-        return acc;
-    }, {aces: 0, unreturnables: 0, inPlay: 0, faults: 0});
+    const counts = useMemo(() => countServeOutcomes(filteredShots), [filteredShots]);
 
     const formatOutcome = (outcome) => {
         if (!outcome) return "N/A";
@@ -192,17 +101,21 @@ export default function ShotLayer({
                     }}
                     onMouseMove={(e) => {
                         const stagePos = e.target.getStage()?.getPointerPosition();
-                        setHoveredShot((prev) => prev ? ({
-                            ...prev,
-                            x: stagePos?.x ?? prev.x,
-                            y: stagePos?.y ?? prev.y,
-                        }) : prev);
+                        setHoveredShot((prev) =>
+                            prev
+                                ? {
+                                      ...prev,
+                                      x: stagePos?.x ?? prev.x,
+                                      y: stagePos?.y ?? prev.y,
+                                  }
+                                : prev
+                        );
                     }}
                     onMouseLeave={() => setHoveredShot(null)}
                 />
             ))}
             {hoveredShot && (
-                <Label x={(hoveredShot.x / s) + 8} y={(hoveredShot.y / s) - 10}>
+                <Label x={hoveredShot.x / s + 8} y={hoveredShot.y / s - 10}>
                     <Tag
                         fill="#0f172a"
                         opacity={0.94}
@@ -227,5 +140,5 @@ export default function ShotLayer({
                 </Label>
             )}
         </Layer>
-    )
+    );
 }
