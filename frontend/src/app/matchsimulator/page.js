@@ -99,7 +99,7 @@ function MatchMultiSelect({
     items,
     selectedIds,
     onChange,
-    placeholder = "Select match(es)",
+    placeholder = "Select matches",
     emptyText = "No matches found on this surface",
     className = "w-full min-w-0",
 }) {
@@ -338,7 +338,7 @@ function PlayerPanel({
                 items={matchOptions}
                 selectedIds={selectedMatchIds}
                 onChange={onMatchIdsChange}
-                placeholder="Select match(es)"
+                placeholder="Select matches"
                 emptyText="No matches found on this surface"
             />
 
