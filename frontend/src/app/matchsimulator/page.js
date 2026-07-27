@@ -6,6 +6,14 @@ import OnePlayerBox from "../components/onePlayerBox";
 import TwoPlayerBox from "../components/TwoPlayerBox";
 import { API_BASE } from "../../lib/api";
 import { flattenServesFromPoints } from "../lib/serveStats";
+import {
+    PLAYERS_CACHE_KEY,
+    PLAYERS_TTL_MS,
+    MATCHES_TTL_MS,
+    matchesCacheKey,
+    readCache,
+    writeCache,
+} from "../../lib/cache";
 import {CaretDownIcon} from "@phosphor-icons/react";
 import {
     Combobox,
@@ -417,6 +425,19 @@ export default function MatchSimulatorPage() {
     async function fetchPlayerMatches(playerName, surface, matchNum) {
         if (!playerName) return;
 
+        const cacheKey = matchesCacheKey(playerName, surface);
+        const cached = readCache(cacheKey, MATCHES_TTL_MS);
+        if (cached?.data && Array.isArray(cached.data)) {
+            if (matchNum === "One") {
+                setSelectedMatchOne(cached.data);
+            } else if (matchNum === "Two") {
+                setSelectedMatchTwo(cached.data);
+            }
+            if (cached.fresh) {
+                return;
+            }
+        }
+
         const encName = encodeURIComponent(playerName);
         const qs =
             surface != null && surface !== ""
@@ -432,6 +453,7 @@ export default function MatchSimulatorPage() {
             }
             const data = await res.json();
             const matches = Array.isArray(data?.matches) ? data.matches : [];
+            writeCache(cacheKey, matches);
             if (matchNum === "One") {
                 setSelectedMatchOne(matches);
             } else if (matchNum === "Two") {
@@ -439,44 +461,30 @@ export default function MatchSimulatorPage() {
             }
         } catch (err) {
             console.error("Failed to load player matches:", err);
-            if (matchNum === "One") {
-                setSelectedMatchOne([]);
-            } else if (matchNum === "Two") {
-                setSelectedMatchTwo([]);
+            if (!cached?.data) {
+                if (matchNum === "One") {
+                    setSelectedMatchOne([]);
+                } else if (matchNum === "Two") {
+                    setSelectedMatchTwo([]);
+                }
             }
         }
     }
 
     useEffect(() => {
-        const saved = sessionStorage.getItem("devState");
-        if (!saved) return;
-
-        try {
-            const s = JSON.parse(saved);
-            setClicked(s.clicked);
-            setOnePlayer(s.onePlayer);
-            setTennisCourt(s.tennisCourt);
-            setSelectedNameOne(s.selectedNameOne);
-            setSelectedSurfaceOne(s.selectedSurfaceOne);
-            if (s.selectedNameOne) {
-                void fetchPlayerMatches(s.selectedNameOne, s.selectedSurfaceOne, "One");
-            }
-        } catch (err) {
-            console.error("Failed to restore session state:", err);
-            sessionStorage.removeItem("devState");
-        }
+        // Drop old "jump back to last viewed match" restore on refresh.
+        sessionStorage.removeItem("devState");
     }, []);
 
     useEffect(() => {
-        const CACHE_KEY = "tennis_players_cache_v1";
-        const cached = window.sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
+        const cached = readCache(PLAYERS_CACHE_KEY, PLAYERS_TTL_MS);
+        // Ignore previously cached empty lists (bad backfill / empty players table).
+        if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
+            setPlayers(cached.data);
+            setPlayersLoading(false);
+        } else if (cached?.data && Array.isArray(cached.data) && cached.data.length === 0) {
             try {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setPlayers(parsed);
-                    setPlayersLoading(false);
-                }
+                window.localStorage.removeItem(PLAYERS_CACHE_KEY);
             } catch {
             }
         }
@@ -486,9 +494,13 @@ export default function MatchSimulatorPage() {
             .then((data) => {
                 const nextPlayers = data.players ?? [];
                 setPlayers(nextPlayers);
-                window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(nextPlayers));
+                if (nextPlayers.length > 0) {
+                    writeCache(PLAYERS_CACHE_KEY, nextPlayers);
+                }
             })
-            .catch(() => setPlayers([]))
+            .catch(() => {
+                if (!(cached?.data?.length > 0)) setPlayers([]);
+            })
             .finally(() => setPlayersLoading(false));
     }, []);
 
@@ -725,13 +737,6 @@ export default function MatchSimulatorPage() {
                                 setSelectedMatchIdsOne([]);
                                 resetFilters();
                                 setTennisCourt(true);
-                                sessionStorage.setItem("devState", JSON.stringify({
-                                    clicked: true,
-                                    onePlayer: true,
-                                    tennisCourt: true,
-                                    selectedNameOne: playerOne,
-                                    selectedSurfaceOne: surface,
-                                }));
                             }}
                         />
                     )}

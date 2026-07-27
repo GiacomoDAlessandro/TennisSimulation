@@ -2,6 +2,8 @@ import pandas as pd
 from db import supabase
 import math
 import time
+import re
+import sys
 from PointsParse import (
     SERVE_DIRECTIONS,
     SHOT_TYPES,
@@ -38,6 +40,77 @@ def clean_int(val):
     if isinstance(val, float) and math.isnan(val):
         return None
     return int(val)
+
+
+def normalize_player_name(name):
+    """Trim and collapse internal whitespace so players PK stays clean."""
+    if name is None or (isinstance(name, float) and math.isnan(name)):
+        return None
+    normalized = re.sub(r"\s+", " ", str(name).strip())
+    return normalized or None
+
+
+def upsert_players(names):
+    """Upsert normalized player names into the players table."""
+    unique = sorted({n for n in names if n})
+    if not unique:
+        return True
+    batch = [{"name": n} for n in unique]
+    ok = True
+    for i in range(0, len(batch), BATCH_SIZE):
+        chunk = batch[i : i + BATCH_SIZE]
+        if not upsert_with_retry("players", chunk, on_conflict="name"):
+            ok = False
+    return ok
+
+
+def backfill_players_from_csv(matches_df=None):
+    """Build players from the matches CSV (normalized)."""
+    if matches_df is None:
+        matches_df = pd.read_csv(MATCHES_FILE)
+        matches_df = matches_df[matches_df["Surface"].isin(["Hard", "Clay", "Grass"])]
+
+    names = []
+    for col in ("Player 1", "Player 2"):
+        if col not in matches_df.columns:
+            continue
+        for val in matches_df[col].tolist():
+            n = normalize_player_name(val)
+            if n:
+                names.append(n)
+
+    print(f"Upserting {len(set(names))} players…")
+    success = upsert_players(names)
+    print(f"{'✓' if success else '✗'} Players upsert done")
+    return success
+
+
+def backfill_players_from_supabase():
+    """Re-sync players from existing matches rows in Supabase."""
+    names = set()
+    page = 0
+    page_size = 1000
+    while True:
+        result = (
+            supabase.table("matches")
+            .select("player1, player2")
+            .range(page * page_size, (page + 1) * page_size - 1)
+            .execute()
+        )
+        rows = result.data or []
+        for match in rows:
+            for key in ("player1", "player2"):
+                n = normalize_player_name(match.get(key))
+                if n:
+                    names.add(n)
+        if len(rows) < page_size:
+            break
+        page += 1
+
+    print(f"Upserting {len(names)} players from Supabase matches…")
+    success = upsert_players(names)
+    print(f"{'✓' if success else '✗'} Players upsert done")
+    return success
 
 
 def extract_point_summary(first, second):
@@ -153,8 +226,8 @@ def _run_load_pipeline():
         winner = winners_lookup.get(match_id)
         batch.append({
             'match_id': match_id,
-            'player1': None if pd.isna(row['Player 1']) else row['Player 1'],
-            'player2': None if pd.isna(row['Player 2']) else row['Player 2'],
+            'player1': normalize_player_name(row['Player 1']),
+            'player2': normalize_player_name(row['Player 2']),
             'surface': None if pd.isna(row['Surface']) else row['Surface'],
             'tournament': None if pd.isna(row['Tournament']) else row['Tournament'],
             'round': None if pd.isna(row['Round']) else row['Round'],
@@ -165,6 +238,7 @@ def _run_load_pipeline():
         success = upsert_with_retry('matches', batch[i:i + BATCH_SIZE])
         print(f"{'✓' if success else '✗'} Matches: {min(i + BATCH_SIZE, len(batch))} / {len(batch)}")
     print("Matches done")
+    backfill_players_from_csv(matches_df)
 
     """
     # ── LOADING POINTS ───────────────────────────────────────────────────────
@@ -225,4 +299,17 @@ def _run_load_pipeline():
 
 
 if __name__ == "__main__":
-    _run_load_pipeline()
+    if len(sys.argv) > 1 and sys.argv[1] in ("--backfill-players", "backfill-players"):
+        # Prefer CSV (source of truth for names); fall back to Supabase scan.
+        try:
+            backfill_players_from_csv()
+        except FileNotFoundError:
+            print("CSV not found; backfilling from Supabase matches…")
+            backfill_players_from_supabase()
+    else:
+        _run_load_pipeline()
+        # Keep players table in sync even when matches upsert block is commented out.
+        try:
+            backfill_players_from_csv()
+        except FileNotFoundError:
+            pass
