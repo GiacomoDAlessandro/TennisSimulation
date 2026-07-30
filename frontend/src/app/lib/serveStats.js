@@ -36,6 +36,24 @@ export function flattenServesFromPoints(points) {
     return serves;
 }
 
+/** Convert court shots (after pressure/outcome filters) into analytics serve rows. */
+export function servesFromShots(shots) {
+    if (!Array.isArray(shots)) return [];
+
+    const serves = [];
+    for (const shot of shots) {
+        const side = getServeSide(shot.score);
+        if (!side) continue;
+        serves.push({
+            side,
+            direction: shot.serveDirection,
+            outcome: shot.outcome,
+            isFault: shot.color === "red" || isFault(shot.outcome),
+        });
+    }
+    return serves;
+}
+
 export function buildServeAnalytics(serves) {
     const bySide = {
         D: {total: 0, wide: 0, body: 0, T: 0},

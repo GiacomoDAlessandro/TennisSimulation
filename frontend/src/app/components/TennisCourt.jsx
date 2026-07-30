@@ -1,5 +1,5 @@
 "use client";
-import { COURT_W, COURT_H, SIDE_PAD } from "../lib/courtConstants";
+import { COURT_W, COURT_H, SIDE_PAD, RIGHT_OUT, STAGE_W, STAGE_H } from "../lib/courtConstants";
 import React, {useEffect, useState} from "react";
 import {Line, Rect, Stage, Layer, Circle, Group} from "react-konva";
 import {ChartBarIcon} from "@phosphor-icons/react";
@@ -8,10 +8,6 @@ import ServeHeatmapLayer from "./ServeHeatmapLayer";
 import ServeAnalyticsModal from "./ServeAnalyticsModal";
 import {SERVE_COLORS} from "../lib/courtUtils";
 
-/** Extra out area past the right outer boundary */
-const RIGHT_OUT = 50;
-const STAGE_W = SIDE_PAD + COURT_W + RIGHT_OUT;
-const STAGE_H = COURT_H;
 const GRASS_STRIPE_COUNT = 14;
 const GRASS_STRIPE_W = COURT_W / GRASS_STRIPE_COUNT;
 /** Single opacity for all mowing stripes (one layer — avoids stronger look inside vs outside) */
@@ -87,6 +83,7 @@ export default function TennisCourt({
                                         pointTypeFilter = "serve",
                                         serveOutcomeFilter = "all",
                                         pressureFilter = "all",
+                                        pointResultFilter = "all",
                                     }) {
     const [mounted, setMounted] = useState(false);
     const [fitScale, setFitScale] = useState(0.72);
@@ -242,6 +239,7 @@ export default function TennisCourt({
         pointTypeFilter,
         serveOutcomeFilter,
         pressureFilter,
+        pointResultFilter,
     };
 
     return (
@@ -424,6 +422,10 @@ export default function TennisCourt({
                 playerName={playerName}
                 surface={surface}
                 points={hasBulkPoints ? points : null}
+                pointTypeFilter={pointTypeFilter}
+                serveOutcomeFilter={serveOutcomeFilter}
+                pressureFilter={pressureFilter}
+                pointResultFilter={pointResultFilter}
             />
         </div>
     );

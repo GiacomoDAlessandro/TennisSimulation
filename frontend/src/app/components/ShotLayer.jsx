@@ -1,12 +1,33 @@
 import {Layer, Circle, Label, Tag, Text} from "react-konva";
 import {useState, useEffect, useMemo} from "react";
-import {SIDE_PAD} from "../lib/courtConstants";
+import {SIDE_PAD, STAGE_W, STAGE_H} from "../lib/courtConstants";
 import {API_BASE} from "../../lib/api";
 import {
     countServeOutcomes,
     filterServeShots,
     pointsToServeShots,
 } from "../lib/serveShots";
+
+const LABEL_W = 160;
+const LABEL_H = 112;
+
+function clampTooltipPosition(pointerX, pointerY) {
+    // Keep the card near the point: prefer above it, only nudge to stay on-stage.
+    // Do not flip to the opposite side of the court.
+    const gap = 10;
+    let placeAbove = pointerY - gap - LABEL_H >= 4;
+    let x = pointerX - LABEL_W / 2;
+    let y = placeAbove ? pointerY - gap - LABEL_H : pointerY + gap;
+
+    x = Math.max(4, Math.min(x, STAGE_W - LABEL_W - 4));
+    y = Math.max(4, Math.min(y, STAGE_H - LABEL_H - 4));
+
+    return {
+        x,
+        y,
+        pointerDirection: placeAbove ? "down" : "up",
+    };
+}
 
 export default function ShotLayer({
     s,
@@ -18,11 +39,11 @@ export default function ShotLayer({
     pointTypeFilter = "serve",
     serveOutcomeFilter = "all",
     pressureFilter = "all",
+    pointResultFilter = "all",
 }) {
     const [fetchedShots, setFetchedShots] = useState([]);
     const [hoveredShot, setHoveredShot] = useState(null);
 
-    // When parent supplies aggregated points, skip the single-match fetch.
     useEffect(() => {
         if (points != null) return;
         if (!matchId) {
@@ -60,8 +81,9 @@ export default function ShotLayer({
                 pointTypeFilter,
                 serveOutcomeFilter,
                 pressureFilter,
+                pointResultFilter,
             }),
-        [shots, pointTypeFilter, serveOutcomeFilter, pressureFilter]
+        [shots, pointTypeFilter, serveOutcomeFilter, pressureFilter, pointResultFilter]
     );
 
     const counts = useMemo(() => countServeOutcomes(filteredShots), [filteredShots]);
@@ -81,6 +103,10 @@ export default function ShotLayer({
     useEffect(() => {
         onStatsChange?.(counts);
     }, [counts, onStatsChange]);
+
+    const tooltip = hoveredShot
+        ? clampTooltipPosition(hoveredShot.x / s, hoveredShot.y / s)
+        : null;
 
     return (
         <Layer scaleX={s} scaleY={s}>
@@ -114,13 +140,13 @@ export default function ShotLayer({
                     onMouseLeave={() => setHoveredShot(null)}
                 />
             ))}
-            {hoveredShot && (
-                <Label x={hoveredShot.x / s + 8} y={hoveredShot.y / s - 10}>
+            {hoveredShot && tooltip && (
+                <Label x={tooltip.x} y={tooltip.y}>
                     <Tag
                         fill="#0f172a"
                         opacity={0.94}
                         cornerRadius={8}
-                        pointerDirection="left"
+                        pointerDirection={tooltip.pointerDirection}
                         pointerWidth={7}
                         pointerHeight={7}
                         lineJoin="round"
@@ -130,7 +156,7 @@ export default function ShotLayer({
                         shadowOffsetY={2}
                     />
                     <Text
-                        text={`Set ${hoveredShot.shot.setScore ?? "N/A"}\nGames ${hoveredShot.shot.gameScore ?? "N/A"}\nPoint ${hoveredShot.shot.score ?? "N/A"}\nServe ${hoveredShot.shot.serveNumber ?? "?"} (${formatServeDirection(hoveredShot.shot.serveDirection)})\n${formatOutcome(hoveredShot.shot.outcome)}`}
+                        text={`Set ${hoveredShot.shot.setScore ?? "N/A"}\nGames ${hoveredShot.shot.gameScore ?? "N/A"}\nPoint ${hoveredShot.shot.score ?? "N/A"}\nServe ${hoveredShot.shot.serveNumber ?? "?"} (${formatServeDirection(hoveredShot.shot.serveDirection)})\n${formatOutcome(hoveredShot.shot.outcome)}\n${hoveredShot.shot.serverWonPoint ? "Won point" : "Lost point"}`}
                         fontSize={12}
                         fontStyle="500"
                         padding={8}

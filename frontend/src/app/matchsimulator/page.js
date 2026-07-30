@@ -72,6 +72,12 @@ const PRESSURE_OPTIONS = [
     {label: "Non-pressure only", value: "non_pressure"},
 ];
 
+const POINT_RESULT_OPTIONS = [
+    {label: "Won or lost", value: "all"},
+    {label: "Won the point", value: "won"},
+    {label: "Lost the point", value: "lost"},
+];
+
 const VIEW_MODE_OPTIONS = [
     {label: "Scatter", value: "scatter"},
     {label: "Heatmap", value: "heatmap"},
@@ -243,9 +249,11 @@ function FilterControls({
     selectedPointTypeOption,
     selectedServeOutcomeOption,
     selectedPressureOption,
+    selectedPointResultOption,
     onPointTypeChange,
     onServeOutcomeChange,
     onPressureChange,
+    onPointResultChange,
     showServeOutcome,
     className = "",
 }) {
@@ -271,6 +279,12 @@ function FilterControls({
                 onValueChange={onPressureChange}
                 placeholder="Pressure points"
             />
+            <SelectionCombobox
+                items={POINT_RESULT_OPTIONS}
+                value={selectedPointResultOption}
+                onValueChange={onPointResultChange}
+                placeholder="Point result"
+            />
         </div>
     );
 }
@@ -285,6 +299,7 @@ function PlayerPanel({
     pointTypeFilter,
     serveOutcomeFilter,
     pressureFilter,
+    pointResultFilter,
     viewMode,
     showFiltersAboveCourt = false,
 }) {
@@ -382,6 +397,7 @@ function PlayerPanel({
                         pointTypeFilter={pointTypeFilter}
                         serveOutcomeFilter={serveOutcomeFilter}
                         pressureFilter={pressureFilter}
+                        pointResultFilter={pointResultFilter}
                     />
                 ) : (
                     <p className="py-8 text-center text-sm text-zinc-500">
@@ -420,6 +436,7 @@ export default function MatchSimulatorPage() {
     const [selectedPointType, setSelectedPointType] = useState("serve");
     const [selectedServeOutcome, setSelectedServeOutcome] = useState("all");
     const [selectedPressureFilter, setSelectedPressureFilter] = useState("all");
+    const [selectedPointResultFilter, setSelectedPointResultFilter] = useState("all");
     const [viewMode, setViewMode] = useState("scatter");
 
     async function fetchPlayerMatches(playerName, surface, matchNum) {
@@ -545,6 +562,8 @@ export default function MatchSimulatorPage() {
         SERVE_OUTCOME_OPTIONS.find((o) => o.value === selectedServeOutcome) ?? SERVE_OUTCOME_OPTIONS[0];
     const selectedPressureOption =
         PRESSURE_OPTIONS.find((o) => o.value === selectedPressureFilter) ?? PRESSURE_OPTIONS[0];
+    const selectedPointResultOption =
+        POINT_RESULT_OPTIONS.find((o) => o.value === selectedPointResultFilter) ?? POINT_RESULT_OPTIONS[0];
 
     const showServeOutcome = selectedPointType === "serve";
 
@@ -557,6 +576,7 @@ export default function MatchSimulatorPage() {
         setSelectedPointType("serve");
         setSelectedServeOutcome("all");
         setSelectedPressureFilter("all");
+        setSelectedPointResultFilter("all");
         setViewMode("scatter");
     };
 
@@ -592,9 +612,11 @@ export default function MatchSimulatorPage() {
                 selectedPointTypeOption={selectedPointTypeOption}
                 selectedServeOutcomeOption={selectedServeOutcomeOption}
                 selectedPressureOption={selectedPressureOption}
+                selectedPointResultOption={selectedPointResultOption}
                 onPointTypeChange={onPointTypeChange}
                 onServeOutcomeChange={(val) => setSelectedServeOutcome(val.value)}
                 onPressureChange={(val) => setSelectedPressureFilter(val.value)}
+                onPointResultChange={(val) => setSelectedPointResultFilter(val.value)}
                 showServeOutcome={showServeOutcome}
             />
         </div>
@@ -704,6 +726,7 @@ export default function MatchSimulatorPage() {
                                 pointTypeFilter={selectedPointType}
                                 serveOutcomeFilter={selectedServeOutcome}
                                 pressureFilter={selectedPressureFilter}
+                                pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
                             />
                             <PlayerPanel
@@ -716,6 +739,7 @@ export default function MatchSimulatorPage() {
                                 pointTypeFilter={selectedPointType}
                                 serveOutcomeFilter={selectedServeOutcome}
                                 pressureFilter={selectedPressureFilter}
+                                pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
                             />
                         </div>
@@ -753,6 +777,7 @@ export default function MatchSimulatorPage() {
                                 pointTypeFilter={selectedPointType}
                                 serveOutcomeFilter={selectedServeOutcome}
                                 pressureFilter={selectedPressureFilter}
+                                pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
                             />
                         </div>

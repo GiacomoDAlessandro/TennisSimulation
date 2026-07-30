@@ -7,7 +7,7 @@ import {
     ComboboxItem,
     ComboboxList
 } from "../../components/ui/combobox";
-import TennisCourt from "./TennisCourt";
+import {filterPlayers} from "../lib/playerSearch";
 
 export default function OnePlayerBox({
                                          players,
@@ -26,15 +26,8 @@ export default function OnePlayerBox({
     //Warning
     const [warningOpen, setWarningOpen] = useState(false);
 
-
-    const filterByPrefix = (list, query) => {
-        const q = query.trim().toLowerCase();
-        if (!q) return list;
-        return list.filter((name) => String(name).toLowerCase().startsWith(q));
-    };
-
     const playerOneOptions = useMemo(
-        () => filterByPrefix(players, queryOne),
+        () => filterPlayers(players, queryOne),
         [players, queryOne]
     );
 

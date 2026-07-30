@@ -7,11 +7,12 @@ import {SERVE_COLORS} from "../lib/courtUtils";
 import {
     SERVE_DIRECTIONS,
     buildServeAnalytics,
-    flattenServesFromPoints,
+    servesFromShots,
     formatDirection,
     getDirectionShare,
     getOutcomeShares,
 } from "../lib/serveStats";
+import {filterServeShots, pointsToServeShots} from "../lib/serveShots";
 
 const SIDES = [
     {value: "D", label: "Deuce"},
@@ -86,6 +87,10 @@ export default function ServeAnalyticsModal({
     playerName,
     surface = "hard",
     points: pointsProp = null,
+    pointTypeFilter = "serve",
+    serveOutcomeFilter = "all",
+    pressureFilter = "all",
+    pointResultFilter = "all",
 }) {
     const [side, setSide] = useState("D");
     const [fetchedPoints, setFetchedPoints] = useState([]);
@@ -124,8 +129,14 @@ export default function ServeAnalyticsModal({
     const points = pointsProp != null ? pointsProp : fetchedPoints;
 
     const analytics = useMemo(() => {
-        return buildServeAnalytics(flattenServesFromPoints(points));
-    }, [points]);
+        const shots = filterServeShots(pointsToServeShots(points, surface), {
+            pointTypeFilter,
+            serveOutcomeFilter,
+            pressureFilter,
+            pointResultFilter,
+        });
+        return buildServeAnalytics(servesFromShots(shots));
+    }, [points, surface, pointTypeFilter, serveOutcomeFilter, pressureFilter, pointResultFilter]);
 
     const outcomeColors = useMemo(() => {
         const palette = SERVE_COLORS[String(surface).toLowerCase()] || SERVE_COLORS.hard;

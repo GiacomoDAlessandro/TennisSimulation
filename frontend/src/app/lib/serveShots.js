@@ -103,6 +103,10 @@ export function pointsToServeShots(points, fallbackSurface) {
                 isGamePoint,
                 isSetPoint,
                 isPressurePoint: isGamePoint || isSetPoint || isTiebreakPressure,
+                serverWonPoint:
+                    point.winner != null &&
+                    point.server != null &&
+                    Number(point.winner) === Number(point.server),
             };
         });
     });
@@ -114,6 +118,7 @@ export function filterServeShots(
         pointTypeFilter = "serve",
         serveOutcomeFilter = "all",
         pressureFilter = "all",
+        pointResultFilter = "all",
     } = {}
 ) {
     return shots.filter((shot) => {
@@ -129,6 +134,9 @@ export function filterServeShots(
 
         if (pressureFilter === "pressure_only" && !shot.isPressurePoint) return false;
         if (pressureFilter === "non_pressure" && shot.isPressurePoint) return false;
+
+        if (pointResultFilter === "won" && !shot.serverWonPoint) return false;
+        if (pointResultFilter === "lost" && shot.serverWonPoint) return false;
 
         return true;
     });
