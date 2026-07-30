@@ -14,6 +14,8 @@ import {
     readCache,
     writeCache,
 } from "../../lib/cache";
+import {chunkIds, fetchServesChunk} from "../lib/fetchBulkServes";
+import {STAGE_H, STAGE_W} from "../lib/courtConstants";
 import {CaretDownIcon} from "@phosphor-icons/react";
 import {
     Combobox,
@@ -306,6 +308,9 @@ function PlayerPanel({
     const [bulkPoints, setBulkPoints] = useState([]);
     const [bulkMatchCount, setBulkMatchCount] = useState(0);
     const [bulkLoading, setBulkLoading] = useState(false);
+    const [bulkChunksDone, setBulkChunksDone] = useState(0);
+    const [bulkChunksTotal, setBulkChunksTotal] = useState(0);
+    const [bulkError, setBulkError] = useState(null);
 
     const hasSelection = selectedMatchIds.length > 0;
     const useBulkPoints = selectedMatchIds.length > 1;
@@ -317,33 +322,40 @@ function PlayerPanel({
             setBulkPoints([]);
             setBulkMatchCount(0);
             setBulkLoading(false);
+            setBulkChunksDone(0);
+            setBulkChunksTotal(0);
+            setBulkError(null);
             return;
         }
 
         let cancelled = false;
+        const chunks = chunkIds(selectedMatchIds);
+        setBulkPoints([]);
+        setBulkMatchCount(0);
         setBulkLoading(true);
+        setBulkChunksDone(0);
+        setBulkChunksTotal(chunks.length);
+        setBulkError(null);
 
-        const encName = encodeURIComponent(name);
-        const params = new URLSearchParams();
-        if (surface) params.set("surface", surface);
-        params.set("match_ids", selectedMatchIds.join(","));
-        const qs = params.toString() ? `?${params.toString()}` : "";
-
-        fetch(`${API_BASE}/getPlayerServesBulk/${encName}${qs}`)
-            .then((res) => res.json())
-            .then((data) => {
+        (async () => {
+            let loadedMatches = 0;
+            for (let i = 0; i < chunks.length; i++) {
                 if (cancelled) return;
-                setBulkPoints(Array.isArray(data?.points) ? data.points : []);
-                setBulkMatchCount(Number(data?.match_count) || 0);
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setBulkPoints([]);
-                setBulkMatchCount(0);
-            })
-            .finally(() => {
-                if (!cancelled) setBulkLoading(false);
-            });
+                try {
+                    const data = await fetchServesChunk(name, surface, chunks[i]);
+                    if (cancelled) return;
+                    setBulkPoints((prev) => prev.concat(data.points));
+                    loadedMatches += data.match_count;
+                    setBulkMatchCount(loadedMatches);
+                    setBulkChunksDone(i + 1);
+                } catch {
+                    if (cancelled) return;
+                    setBulkError("Some matches failed to load.");
+                    setBulkChunksDone(i + 1);
+                }
+            }
+            if (!cancelled) setBulkLoading(false);
+        })();
 
         return () => {
             cancelled = true;
@@ -354,6 +366,11 @@ function PlayerPanel({
         () => flattenServesFromPoints(bulkPoints).length,
         [bulkPoints]
     );
+
+    const showCourtSkeleton = useBulkPoints && bulkLoading && bulkPoints.length === 0;
+    const courtScale = 0.62;
+    const skeletonW = STAGE_W * courtScale;
+    const skeletonH = STAGE_H * courtScale;
 
     return (
         <div className="flex w-full flex-col gap-3">
@@ -368,11 +385,16 @@ function PlayerPanel({
             {hasSelection && showFiltersAboveCourt ? filtersNode : null}
 
             {hasSelection && selectedMatchIds.length > 1 && (
-                <p className="text-center text-xs text-zinc-500">
-                    {bulkLoading
-                        ? "Loading serves…"
-                        : `${serveCount} serve${serveCount === 1 ? "" : "s"} across ${bulkMatchCount} match${bulkMatchCount === 1 ? "" : "es"}`}
-                </p>
+                <div className="space-y-0.5 text-center text-xs text-zinc-500">
+                    <p>
+                        {bulkLoading
+                            ? `Loading serves… ${bulkChunksDone}/${bulkChunksTotal} batches`
+                            : `${serveCount} serve${serveCount === 1 ? "" : "s"} across ${bulkMatchCount} match${bulkMatchCount === 1 ? "" : "es"}`}
+                    </p>
+                    {bulkError ? (
+                        <p className="text-red-600">{bulkError}</p>
+                    ) : null}
+                </div>
             )}
 
             <div className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -386,23 +408,29 @@ function PlayerPanel({
                         {name}
                     </a>
                 </h3>
-                {hasSelection ? (
+                {!hasSelection ? (
+                    <p className="py-8 text-center text-sm text-zinc-500">
+                        Select a match to view serves.
+                    </p>
+                ) : showCourtSkeleton ? (
+                    <div
+                        className="animate-pulse rounded-xl bg-zinc-200/80"
+                        style={{width: skeletonW, height: skeletonH}}
+                        aria-hidden
+                    />
+                ) : (
                     <TennisCourt
                         surface={surface}
                         playerName={name}
                         matchId={useBulkPoints ? "" : singleSelectedMatchId}
                         points={useBulkPoints ? bulkPoints : null}
-                        courtScale={0.62}
+                        courtScale={courtScale}
                         viewMode={viewMode}
                         pointTypeFilter={pointTypeFilter}
                         serveOutcomeFilter={serveOutcomeFilter}
                         pressureFilter={pressureFilter}
                         pointResultFilter={pointResultFilter}
                     />
-                ) : (
-                    <p className="py-8 text-center text-sm text-zinc-500">
-                        Select a match to view serves.
-                    </p>
                 )}
             </div>
 

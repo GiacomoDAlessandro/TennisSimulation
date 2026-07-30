@@ -283,6 +283,11 @@ def get_player_serves_bulk(
     surface_norm = _normalize_surface(surface) if surface else None
 
     if match_ids:
+        if len(match_ids) > 3500:
+            raise HTTPException(
+                status_code=400,
+                detail="Too many match_ids in query string; request fewer matches per call.",
+            )
         id_list = [mid.strip() for mid in match_ids.split(",") if mid.strip()]
         matches = _fetch_matches_by_ids(id_list)
         if surface_norm:

@@ -8,24 +8,18 @@ import {
     pointsToServeShots,
 } from "../lib/serveShots";
 
-const LABEL_W = 160;
-const LABEL_H = 112;
+const TIP_GAP = 8;
 
-function clampTooltipPosition(pointerX, pointerY) {
-    // Keep the card near the point: prefer above it, only nudge to stay on-stage.
-    // Do not flip to the opposite side of the court.
-    const gap = 10;
-    let placeAbove = pointerY - gap - LABEL_H >= 4;
-    let x = pointerX - LABEL_W / 2;
-    let y = placeAbove ? pointerY - gap - LABEL_H : pointerY + gap;
-
-    x = Math.max(4, Math.min(x, STAGE_W - LABEL_W - 4));
-    y = Math.max(4, Math.min(y, STAGE_H - LABEL_H - 4));
-
+function tipAtMarker(shot) {
+    const tipX = Math.max(4, Math.min(shot.x + SIDE_PAD, STAGE_W - 4));
+    const tipY = shot.y;
+    if (tipY - TIP_GAP > 4) {
+        return {x: tipX, y: tipY - TIP_GAP, pointerDirection: "down"};
+    }
     return {
-        x,
-        y,
-        pointerDirection: placeAbove ? "down" : "up",
+        x: tipX,
+        y: Math.min(tipY + TIP_GAP, STAGE_H - 4),
+        pointerDirection: "up",
     };
 }
 
@@ -104,9 +98,7 @@ export default function ShotLayer({
         onStatsChange?.(counts);
     }, [counts, onStatsChange]);
 
-    const tooltip = hoveredShot
-        ? clampTooltipPosition(hoveredShot.x / s, hoveredShot.y / s)
-        : null;
+    const tooltip = hoveredShot ? tipAtMarker(hoveredShot) : null;
 
     return (
         <Layer scaleX={s} scaleY={s}>
@@ -117,31 +109,12 @@ export default function ShotLayer({
                     y={shot.y}
                     radius={5}
                     fill={shot.color}
-                    onMouseEnter={(e) => {
-                        const stagePos = e.target.getStage()?.getPointerPosition();
-                        setHoveredShot({
-                            shot,
-                            x: stagePos?.x ?? 0,
-                            y: stagePos?.y ?? 0,
-                        });
-                    }}
-                    onMouseMove={(e) => {
-                        const stagePos = e.target.getStage()?.getPointerPosition();
-                        setHoveredShot((prev) =>
-                            prev
-                                ? {
-                                      ...prev,
-                                      x: stagePos?.x ?? prev.x,
-                                      y: stagePos?.y ?? prev.y,
-                                  }
-                                : prev
-                        );
-                    }}
+                    onMouseEnter={() => setHoveredShot(shot)}
                     onMouseLeave={() => setHoveredShot(null)}
                 />
             ))}
             {hoveredShot && tooltip && (
-                <Label x={tooltip.x} y={tooltip.y}>
+                <Label x={tooltip.x} y={tooltip.y} listening={false}>
                     <Tag
                         fill="#0f172a"
                         opacity={0.94}
@@ -156,7 +129,7 @@ export default function ShotLayer({
                         shadowOffsetY={2}
                     />
                     <Text
-                        text={`Set ${hoveredShot.shot.setScore ?? "N/A"}\nGames ${hoveredShot.shot.gameScore ?? "N/A"}\nPoint ${hoveredShot.shot.score ?? "N/A"}\nServe ${hoveredShot.shot.serveNumber ?? "?"} (${formatServeDirection(hoveredShot.shot.serveDirection)})\n${formatOutcome(hoveredShot.shot.outcome)}\n${hoveredShot.shot.serverWonPoint ? "Won point" : "Lost point"}`}
+                        text={`Set ${hoveredShot.setScore ?? "N/A"}\nGames ${hoveredShot.gameScore ?? "N/A"}\nPoint ${hoveredShot.score ?? "N/A"}\nServe ${hoveredShot.serveNumber ?? "?"} (${formatServeDirection(hoveredShot.serveDirection)})\n${formatOutcome(hoveredShot.outcome)}\n${hoveredShot.serverWonPoint ? "Won point" : "Lost point"}`}
                         fontSize={12}
                         fontStyle="500"
                         padding={8}
