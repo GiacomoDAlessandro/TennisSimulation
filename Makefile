@@ -1,14 +1,16 @@
 # TennisSimulation - local development
 #
 # Usage:
-#   make install   Install backend (pip) and frontend (npm) dependencies
+#   make install   Install backend and frontend dependencies
 #   make dev       Run backend and frontend together
 #   make backend   Run only the FastAPI backend (http://127.0.0.1:8000)
 #   make frontend  Run only the Next.js frontend (http://localhost:3000)
 #
 # First time:
-#   1. Add a .env file in the repo root with your Supabase keys (see `make help`).
+#   1. Add your Supabase keys to backend/.env (see `make help`).
 #   2. Run `make install`, then `make dev`.
+
+PYTHON := .venv/bin/python
 
 .PHONY: help install dev backend frontend
 
@@ -16,11 +18,10 @@ help:
 	@echo "TennisSimulation - local development"
 	@echo ""
 	@echo "Setup (first time):"
-	@echo "  1. Create .env in the repo root with:"
+	@echo "  1. Create backend/.env with:"
 	@echo "       NEXT_PUBLIC_SUPABASE_URL"
 	@echo "       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
-	@echo "       NEXT_PUBLIC_API_URL=http://127.0.0.1:8000  (optional; default)"
-	@echo "  2. make install   Install backend (pip) and frontend (npm) dependencies"
+	@echo "  2. make install   Install backend and frontend dependencies"
 	@echo ""
 	@echo "Run:"
 	@echo "  make dev          Run backend and frontend together"
@@ -28,15 +29,16 @@ help:
 	@echo "  make frontend     Frontend only — http://localhost:3000"
 
 install:
-	cd backend && pip install -r requirements.txt
-	cd frontend && npm install
+	npm --prefix frontend install
+	python3 -m venv .venv
+	$(PYTHON) -m pip install -r backend/requirements.txt
 
 backend:
-	cd backend && uvicorn main:app --reload --host 127.0.0.1 --port 8000
+	cd backend && ../$(PYTHON) -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 frontend:
-	cd frontend && npm run dev
+	npm --prefix frontend run dev
 
 # Runs both servers in parallel; Ctrl+C stops them.
 dev:
-	$(MAKE) -j2 backend frontend
+	@$(MAKE) --no-print-directory -j2 frontend backend
