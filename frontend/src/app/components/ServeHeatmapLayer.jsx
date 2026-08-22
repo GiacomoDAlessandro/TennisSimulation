@@ -25,6 +25,7 @@ export default function ServeHeatmapLayer({
     pointTypeFilter = "serve",
     serveOutcomeFilter = "all",
     pressureFilter = "all",
+    pointResultFilter = "all",
 }) {
     const canvasRef = useRef(null);
     const [fetchedPoints, setFetchedPoints] = useState([]);
@@ -61,8 +62,9 @@ export default function ServeHeatmapLayer({
             pointTypeFilter,
             serveOutcomeFilter,
             pressureFilter,
+            pointResultFilter,
         });
-    }, [sourcePoints, surface, pointTypeFilter, serveOutcomeFilter, pressureFilter]);
+    }, [sourcePoints, surface, pointTypeFilter, serveOutcomeFilter, pressureFilter, pointResultFilter]);
 
     useEffect(() => {
         onStatsChange?.(countServeOutcomes(filteredShots));

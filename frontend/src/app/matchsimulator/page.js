@@ -6,6 +6,16 @@ import OnePlayerBox from "../components/onePlayerBox";
 import TwoPlayerBox from "../components/TwoPlayerBox";
 import { API_BASE } from "../../lib/api";
 import { flattenServesFromPoints } from "../lib/serveStats";
+import {
+    PLAYERS_CACHE_KEY,
+    PLAYERS_TTL_MS,
+    MATCHES_TTL_MS,
+    matchesCacheKey,
+    readCache,
+    writeCache,
+} from "../../lib/cache";
+import {chunkIds, fetchServesChunk} from "../lib/fetchBulkServes";
+import {STAGE_H, STAGE_W} from "../lib/courtConstants";
 import {CaretDownIcon} from "@phosphor-icons/react";
 import {
     Combobox,
@@ -64,6 +74,12 @@ const PRESSURE_OPTIONS = [
     {label: "Non-pressure only", value: "non_pressure"},
 ];
 
+const POINT_RESULT_OPTIONS = [
+    {label: "Won or lost", value: "all"},
+    {label: "Won the point", value: "won"},
+    {label: "Lost the point", value: "lost"},
+];
+
 const VIEW_MODE_OPTIONS = [
     {label: "Scatter", value: "scatter"},
     {label: "Heatmap", value: "heatmap"},
@@ -99,7 +115,7 @@ function MatchMultiSelect({
     items,
     selectedIds,
     onChange,
-    placeholder = "Select match(es)",
+    placeholder = "Select matches",
     emptyText = "No matches found on this surface",
     className = "w-full min-w-0",
 }) {
@@ -235,9 +251,11 @@ function FilterControls({
     selectedPointTypeOption,
     selectedServeOutcomeOption,
     selectedPressureOption,
+    selectedPointResultOption,
     onPointTypeChange,
     onServeOutcomeChange,
     onPressureChange,
+    onPointResultChange,
     showServeOutcome,
     className = "",
 }) {
@@ -263,6 +281,12 @@ function FilterControls({
                 onValueChange={onPressureChange}
                 placeholder="Pressure points"
             />
+            <SelectionCombobox
+                items={POINT_RESULT_OPTIONS}
+                value={selectedPointResultOption}
+                onValueChange={onPointResultChange}
+                placeholder="Point result"
+            />
         </div>
     );
 }
@@ -277,12 +301,16 @@ function PlayerPanel({
     pointTypeFilter,
     serveOutcomeFilter,
     pressureFilter,
+    pointResultFilter,
     viewMode,
     showFiltersAboveCourt = false,
 }) {
     const [bulkPoints, setBulkPoints] = useState([]);
     const [bulkMatchCount, setBulkMatchCount] = useState(0);
     const [bulkLoading, setBulkLoading] = useState(false);
+    const [bulkChunksDone, setBulkChunksDone] = useState(0);
+    const [bulkChunksTotal, setBulkChunksTotal] = useState(0);
+    const [bulkError, setBulkError] = useState(null);
 
     const hasSelection = selectedMatchIds.length > 0;
     const useBulkPoints = selectedMatchIds.length > 1;
@@ -294,33 +322,40 @@ function PlayerPanel({
             setBulkPoints([]);
             setBulkMatchCount(0);
             setBulkLoading(false);
+            setBulkChunksDone(0);
+            setBulkChunksTotal(0);
+            setBulkError(null);
             return;
         }
 
         let cancelled = false;
+        const chunks = chunkIds(selectedMatchIds);
+        setBulkPoints([]);
+        setBulkMatchCount(0);
         setBulkLoading(true);
+        setBulkChunksDone(0);
+        setBulkChunksTotal(chunks.length);
+        setBulkError(null);
 
-        const encName = encodeURIComponent(name);
-        const params = new URLSearchParams();
-        if (surface) params.set("surface", surface);
-        params.set("match_ids", selectedMatchIds.join(","));
-        const qs = params.toString() ? `?${params.toString()}` : "";
-
-        fetch(`${API_BASE}/getPlayerServesBulk/${encName}${qs}`)
-            .then((res) => res.json())
-            .then((data) => {
+        (async () => {
+            let loadedMatches = 0;
+            for (let i = 0; i < chunks.length; i++) {
                 if (cancelled) return;
-                setBulkPoints(Array.isArray(data?.points) ? data.points : []);
-                setBulkMatchCount(Number(data?.match_count) || 0);
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setBulkPoints([]);
-                setBulkMatchCount(0);
-            })
-            .finally(() => {
-                if (!cancelled) setBulkLoading(false);
-            });
+                try {
+                    const data = await fetchServesChunk(name, surface, chunks[i]);
+                    if (cancelled) return;
+                    setBulkPoints((prev) => prev.concat(data.points));
+                    loadedMatches += data.match_count;
+                    setBulkMatchCount(loadedMatches);
+                    setBulkChunksDone(i + 1);
+                } catch {
+                    if (cancelled) return;
+                    setBulkError("Some matches failed to load.");
+                    setBulkChunksDone(i + 1);
+                }
+            }
+            if (!cancelled) setBulkLoading(false);
+        })();
 
         return () => {
             cancelled = true;
@@ -332,24 +367,34 @@ function PlayerPanel({
         [bulkPoints]
     );
 
+    const showCourtSkeleton = useBulkPoints && bulkLoading && bulkPoints.length === 0;
+    const courtScale = 0.62;
+    const skeletonW = STAGE_W * courtScale;
+    const skeletonH = STAGE_H * courtScale;
+
     return (
         <div className="flex w-full flex-col gap-3">
             <MatchMultiSelect
                 items={matchOptions}
                 selectedIds={selectedMatchIds}
                 onChange={onMatchIdsChange}
-                placeholder="Select match(es)"
+                placeholder="Select matches"
                 emptyText="No matches found on this surface"
             />
 
             {hasSelection && showFiltersAboveCourt ? filtersNode : null}
 
             {hasSelection && selectedMatchIds.length > 1 && (
-                <p className="text-center text-xs text-zinc-500">
-                    {bulkLoading
-                        ? "Loading serves…"
-                        : `${serveCount} serve${serveCount === 1 ? "" : "s"} across ${bulkMatchCount} match${bulkMatchCount === 1 ? "" : "es"}`}
-                </p>
+                <div className="space-y-0.5 text-center text-xs text-zinc-500">
+                    <p>
+                        {bulkLoading
+                            ? `Loading serves… ${bulkChunksDone}/${bulkChunksTotal} batches`
+                            : `${serveCount} serve${serveCount === 1 ? "" : "s"} across ${bulkMatchCount} match${bulkMatchCount === 1 ? "" : "es"}`}
+                    </p>
+                    {bulkError ? (
+                        <p className="text-red-600">{bulkError}</p>
+                    ) : null}
+                </div>
             )}
 
             <div className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -363,22 +408,29 @@ function PlayerPanel({
                         {name}
                     </a>
                 </h3>
-                {hasSelection ? (
+                {!hasSelection ? (
+                    <p className="py-8 text-center text-sm text-zinc-500">
+                        Select a match to view serves.
+                    </p>
+                ) : showCourtSkeleton ? (
+                    <div
+                        className="animate-pulse rounded-xl bg-zinc-200/80"
+                        style={{width: skeletonW, height: skeletonH}}
+                        aria-hidden
+                    />
+                ) : (
                     <TennisCourt
                         surface={surface}
                         playerName={name}
                         matchId={useBulkPoints ? "" : singleSelectedMatchId}
                         points={useBulkPoints ? bulkPoints : null}
-                        courtScale={0.62}
+                        courtScale={courtScale}
                         viewMode={viewMode}
                         pointTypeFilter={pointTypeFilter}
                         serveOutcomeFilter={serveOutcomeFilter}
                         pressureFilter={pressureFilter}
+                        pointResultFilter={pointResultFilter}
                     />
-                ) : (
-                    <p className="py-8 text-center text-sm text-zinc-500">
-                        Select a match to view serves.
-                    </p>
                 )}
             </div>
 
@@ -412,10 +464,24 @@ export default function MatchSimulatorPage() {
     const [selectedPointType, setSelectedPointType] = useState("serve");
     const [selectedServeOutcome, setSelectedServeOutcome] = useState("all");
     const [selectedPressureFilter, setSelectedPressureFilter] = useState("all");
+    const [selectedPointResultFilter, setSelectedPointResultFilter] = useState("all");
     const [viewMode, setViewMode] = useState("scatter");
 
     async function fetchPlayerMatches(playerName, surface, matchNum) {
         if (!playerName) return;
+
+        const cacheKey = matchesCacheKey(playerName, surface);
+        const cached = readCache(cacheKey, MATCHES_TTL_MS);
+        if (cached?.data && Array.isArray(cached.data)) {
+            if (matchNum === "One") {
+                setSelectedMatchOne(cached.data);
+            } else if (matchNum === "Two") {
+                setSelectedMatchTwo(cached.data);
+            }
+            if (cached.fresh) {
+                return;
+            }
+        }
 
         const encName = encodeURIComponent(playerName);
         const qs =
@@ -432,6 +498,7 @@ export default function MatchSimulatorPage() {
             }
             const data = await res.json();
             const matches = Array.isArray(data?.matches) ? data.matches : [];
+            writeCache(cacheKey, matches);
             if (matchNum === "One") {
                 setSelectedMatchOne(matches);
             } else if (matchNum === "Two") {
@@ -439,44 +506,30 @@ export default function MatchSimulatorPage() {
             }
         } catch (err) {
             console.error("Failed to load player matches:", err);
-            if (matchNum === "One") {
-                setSelectedMatchOne([]);
-            } else if (matchNum === "Two") {
-                setSelectedMatchTwo([]);
+            if (!cached?.data) {
+                if (matchNum === "One") {
+                    setSelectedMatchOne([]);
+                } else if (matchNum === "Two") {
+                    setSelectedMatchTwo([]);
+                }
             }
         }
     }
 
     useEffect(() => {
-        const saved = sessionStorage.getItem("devState");
-        if (!saved) return;
-
-        try {
-            const s = JSON.parse(saved);
-            setClicked(s.clicked);
-            setOnePlayer(s.onePlayer);
-            setTennisCourt(s.tennisCourt);
-            setSelectedNameOne(s.selectedNameOne);
-            setSelectedSurfaceOne(s.selectedSurfaceOne);
-            if (s.selectedNameOne) {
-                void fetchPlayerMatches(s.selectedNameOne, s.selectedSurfaceOne, "One");
-            }
-        } catch (err) {
-            console.error("Failed to restore session state:", err);
-            sessionStorage.removeItem("devState");
-        }
+        // Drop old "jump back to last viewed match" restore on refresh.
+        sessionStorage.removeItem("devState");
     }, []);
 
     useEffect(() => {
-        const CACHE_KEY = "tennis_players_cache_v1";
-        const cached = window.sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
+        const cached = readCache(PLAYERS_CACHE_KEY, PLAYERS_TTL_MS);
+        // Ignore previously cached empty lists (bad backfill / empty players table).
+        if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
+            setPlayers(cached.data);
+            setPlayersLoading(false);
+        } else if (cached?.data && Array.isArray(cached.data) && cached.data.length === 0) {
             try {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setPlayers(parsed);
-                    setPlayersLoading(false);
-                }
+                window.localStorage.removeItem(PLAYERS_CACHE_KEY);
             } catch {
             }
         }
@@ -486,9 +539,13 @@ export default function MatchSimulatorPage() {
             .then((data) => {
                 const nextPlayers = data.players ?? [];
                 setPlayers(nextPlayers);
-                window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(nextPlayers));
+                if (nextPlayers.length > 0) {
+                    writeCache(PLAYERS_CACHE_KEY, nextPlayers);
+                }
             })
-            .catch(() => setPlayers([]))
+            .catch(() => {
+                if (!(cached?.data?.length > 0)) setPlayers([]);
+            })
             .finally(() => setPlayersLoading(false));
     }, []);
 
@@ -533,6 +590,8 @@ export default function MatchSimulatorPage() {
         SERVE_OUTCOME_OPTIONS.find((o) => o.value === selectedServeOutcome) ?? SERVE_OUTCOME_OPTIONS[0];
     const selectedPressureOption =
         PRESSURE_OPTIONS.find((o) => o.value === selectedPressureFilter) ?? PRESSURE_OPTIONS[0];
+    const selectedPointResultOption =
+        POINT_RESULT_OPTIONS.find((o) => o.value === selectedPointResultFilter) ?? POINT_RESULT_OPTIONS[0];
 
     const showServeOutcome = selectedPointType === "serve";
 
@@ -545,6 +604,7 @@ export default function MatchSimulatorPage() {
         setSelectedPointType("serve");
         setSelectedServeOutcome("all");
         setSelectedPressureFilter("all");
+        setSelectedPointResultFilter("all");
         setViewMode("scatter");
     };
 
@@ -580,9 +640,11 @@ export default function MatchSimulatorPage() {
                 selectedPointTypeOption={selectedPointTypeOption}
                 selectedServeOutcomeOption={selectedServeOutcomeOption}
                 selectedPressureOption={selectedPressureOption}
+                selectedPointResultOption={selectedPointResultOption}
                 onPointTypeChange={onPointTypeChange}
                 onServeOutcomeChange={(val) => setSelectedServeOutcome(val.value)}
                 onPressureChange={(val) => setSelectedPressureFilter(val.value)}
+                onPointResultChange={(val) => setSelectedPointResultFilter(val.value)}
                 showServeOutcome={showServeOutcome}
             />
         </div>
@@ -692,6 +754,7 @@ export default function MatchSimulatorPage() {
                                 pointTypeFilter={selectedPointType}
                                 serveOutcomeFilter={selectedServeOutcome}
                                 pressureFilter={selectedPressureFilter}
+                                pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
                             />
                             <PlayerPanel
@@ -704,6 +767,7 @@ export default function MatchSimulatorPage() {
                                 pointTypeFilter={selectedPointType}
                                 serveOutcomeFilter={selectedServeOutcome}
                                 pressureFilter={selectedPressureFilter}
+                                pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
                             />
                         </div>
@@ -725,13 +789,6 @@ export default function MatchSimulatorPage() {
                                 setSelectedMatchIdsOne([]);
                                 resetFilters();
                                 setTennisCourt(true);
-                                sessionStorage.setItem("devState", JSON.stringify({
-                                    clicked: true,
-                                    onePlayer: true,
-                                    tennisCourt: true,
-                                    selectedNameOne: playerOne,
-                                    selectedSurfaceOne: surface,
-                                }));
                             }}
                         />
                     )}
@@ -748,6 +805,7 @@ export default function MatchSimulatorPage() {
                                 pointTypeFilter={selectedPointType}
                                 serveOutcomeFilter={selectedServeOutcome}
                                 pressureFilter={selectedPressureFilter}
+                                pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
                             />
                         </div>

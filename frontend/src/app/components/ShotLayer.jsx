@@ -1,12 +1,27 @@
 import {Layer, Circle, Label, Tag, Text} from "react-konva";
 import {useState, useEffect, useMemo} from "react";
-import {SIDE_PAD} from "../lib/courtConstants";
+import {SIDE_PAD, STAGE_W, STAGE_H} from "../lib/courtConstants";
 import {API_BASE} from "../../lib/api";
 import {
     countServeOutcomes,
     filterServeShots,
     pointsToServeShots,
 } from "../lib/serveShots";
+
+const TIP_GAP = 8;
+
+function tipAtMarker(shot) {
+    const tipX = Math.max(4, Math.min(shot.x + SIDE_PAD, STAGE_W - 4));
+    const tipY = shot.y;
+    if (tipY - TIP_GAP > 4) {
+        return {x: tipX, y: tipY - TIP_GAP, pointerDirection: "down"};
+    }
+    return {
+        x: tipX,
+        y: Math.min(tipY + TIP_GAP, STAGE_H - 4),
+        pointerDirection: "up",
+    };
+}
 
 export default function ShotLayer({
     s,
@@ -18,11 +33,11 @@ export default function ShotLayer({
     pointTypeFilter = "serve",
     serveOutcomeFilter = "all",
     pressureFilter = "all",
+    pointResultFilter = "all",
 }) {
     const [fetchedShots, setFetchedShots] = useState([]);
     const [hoveredShot, setHoveredShot] = useState(null);
 
-    // When parent supplies aggregated points, skip the single-match fetch.
     useEffect(() => {
         if (points != null) return;
         if (!matchId) {
@@ -60,8 +75,9 @@ export default function ShotLayer({
                 pointTypeFilter,
                 serveOutcomeFilter,
                 pressureFilter,
+                pointResultFilter,
             }),
-        [shots, pointTypeFilter, serveOutcomeFilter, pressureFilter]
+        [shots, pointTypeFilter, serveOutcomeFilter, pressureFilter, pointResultFilter]
     );
 
     const counts = useMemo(() => countServeOutcomes(filteredShots), [filteredShots]);
@@ -82,6 +98,8 @@ export default function ShotLayer({
         onStatsChange?.(counts);
     }, [counts, onStatsChange]);
 
+    const tooltip = hoveredShot ? tipAtMarker(hoveredShot) : null;
+
     return (
         <Layer scaleX={s} scaleY={s}>
             {filteredShots.map((shot, i) => (
@@ -91,36 +109,17 @@ export default function ShotLayer({
                     y={shot.y}
                     radius={5}
                     fill={shot.color}
-                    onMouseEnter={(e) => {
-                        const stagePos = e.target.getStage()?.getPointerPosition();
-                        setHoveredShot({
-                            shot,
-                            x: stagePos?.x ?? 0,
-                            y: stagePos?.y ?? 0,
-                        });
-                    }}
-                    onMouseMove={(e) => {
-                        const stagePos = e.target.getStage()?.getPointerPosition();
-                        setHoveredShot((prev) =>
-                            prev
-                                ? {
-                                      ...prev,
-                                      x: stagePos?.x ?? prev.x,
-                                      y: stagePos?.y ?? prev.y,
-                                  }
-                                : prev
-                        );
-                    }}
+                    onMouseEnter={() => setHoveredShot(shot)}
                     onMouseLeave={() => setHoveredShot(null)}
                 />
             ))}
-            {hoveredShot && (
-                <Label x={hoveredShot.x / s + 8} y={hoveredShot.y / s - 10}>
+            {hoveredShot && tooltip && (
+                <Label x={tooltip.x} y={tooltip.y} listening={false}>
                     <Tag
                         fill="#0f172a"
                         opacity={0.94}
                         cornerRadius={8}
-                        pointerDirection="left"
+                        pointerDirection={tooltip.pointerDirection}
                         pointerWidth={7}
                         pointerHeight={7}
                         lineJoin="round"
@@ -130,7 +129,7 @@ export default function ShotLayer({
                         shadowOffsetY={2}
                     />
                     <Text
-                        text={`Set ${hoveredShot.shot.setScore ?? "N/A"}\nGames ${hoveredShot.shot.gameScore ?? "N/A"}\nPoint ${hoveredShot.shot.score ?? "N/A"}\nServe ${hoveredShot.shot.serveNumber ?? "?"} (${formatServeDirection(hoveredShot.shot.serveDirection)})\n${formatOutcome(hoveredShot.shot.outcome)}`}
+                        text={`Set ${hoveredShot.setScore ?? "N/A"}\nGames ${hoveredShot.gameScore ?? "N/A"}\nPoint ${hoveredShot.score ?? "N/A"}\nServe ${hoveredShot.serveNumber ?? "?"} (${formatServeDirection(hoveredShot.serveDirection)})\n${formatOutcome(hoveredShot.outcome)}\n${hoveredShot.serverWonPoint ? "Won point" : "Lost point"}`}
                         fontSize={12}
                         fontStyle="500"
                         padding={8}
