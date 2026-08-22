@@ -104,6 +104,9 @@ def extract_point_summary(first, second):
 
 
 def upsert_with_retry(table, batch, on_conflict=None):
+    if not supabase:
+        print("Supabase client not initialized. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.")
+        return False
     for attempt in range(MAX_RETRIES):
         try:
             if on_conflict:

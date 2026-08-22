@@ -2,7 +2,7 @@ from typing import Optional
 
 from db import supabase
 from PointsParse import parse_shot_sequence, SERVE_DIRECTIONS, SHOT_TYPES, OUTCOMES
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -22,6 +22,11 @@ def root():
 
 @app.get("/getAllPlayers")
 def get_players():
+    if not supabase:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase client not initialized. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+        )
     players = set()
     page = 0
     page_size = 1000
@@ -55,6 +60,11 @@ def get_player_matches(
     surface: Optional[str] = Query(None),
 ):
     """Matches rows match loadData.py: player1, player2, tournament, round, surface (Hard/Clay/Grass)."""
+    if not supabase:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase client not initialized. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+        )
     query = (
         supabase.table("matches")
         .select("match_id, player1, player2, tournament, round, surface")
@@ -77,7 +87,7 @@ POINT_SELECT = (
 
 def _fetch_points_paginated(match_ids: list, server_slot: int) -> list:
     """Fetch all points for match_ids where server == server_slot, paginating past the 1000-row cap."""
-    if not match_ids:
+    if not match_ids or not supabase:
         return []
 
     page_size = 1000
@@ -108,6 +118,11 @@ def _fetch_points_paginated(match_ids: list, server_slot: int) -> list:
 
 @app.get("/getPlayerServes/{match_id}/{player_name}")
 def get_match_points(match_id: str, player_name: str):
+    if not supabase:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase client not initialized. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+        )
 
     ourPlayer = 0
 
@@ -126,6 +141,7 @@ def get_match_points(match_id: str, player_name: str):
 
     result = query.execute()
     return {"points": result.data or []}
+
 
 
 @app.get("/getPlayerServesBulk/{player_name}")
