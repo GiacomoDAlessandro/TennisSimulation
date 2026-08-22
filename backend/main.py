@@ -42,6 +42,14 @@ def get_players():
         page += 1
     return {"players": sorted(list(players))}
 
+def _match_date_from_id(match_id) -> Optional[str]:
+    s = str(match_id or "")
+    prefix = s[:8]
+    if len(prefix) == 8 and prefix.isdigit():
+        return f"{prefix[:4]}-{prefix[4:6]}-{prefix[6:8]}"
+    return None
+
+
 def _normalize_surface(surface: str) -> str:
     s = surface.strip().lower()
     if not s:
@@ -69,7 +77,7 @@ def get_player_matches(
 
 
 POINT_SELECT = (
-    "match_id, point_number, server, score, set1, set2, game1, game2, "
+    "match_id, point_number, server, winner, game_number, score, set1, set2, game1, game2, "
     "first_serve_direction, first_serve_outcome, "
     "second_serve_direction, second_serve_outcome, point_end, had_fault"
 )
@@ -119,7 +127,7 @@ def get_match_points(match_id: str, player_name: str):
         ourPlayer = 2
     query = (
         supabase.table("points")
-        .select("point_number, server, score, set1, set2, game1, game2, first_serve_direction, first_serve_outcome,"
+        .select("point_number, server, winner, game_number, score, set1, set2, game1, game2, first_serve_direction, first_serve_outcome,"
                 "second_serve_direction, second_serve_outcome, point_end, had_fault")
         .eq("match_id", match_id).eq("server", ourPlayer)
     )
@@ -151,12 +159,17 @@ def get_player_serves_bulk(
 
     slot1_ids = []
     slot2_ids = []
-    surface_by_match = {}
+    meta_by_match = {}
     for m in matches:
         mid = m.get("match_id")
         if mid is None:
             continue
-        surface_by_match[mid] = m.get("surface")
+        meta_by_match[mid] = {
+            "surface": m.get("surface"),
+            "tournament": m.get("tournament"),
+            "round": m.get("round"),
+            "date": _match_date_from_id(mid),
+        }
         if m.get("player1") == player_name:
             slot1_ids.append(mid)
         else:
@@ -167,6 +180,10 @@ def get_player_serves_bulk(
     points.extend(_fetch_points_paginated(slot2_ids, 2))
 
     for point in points:
-        point["surface"] = surface_by_match.get(point.get("match_id"))
+        meta = meta_by_match.get(point.get("match_id")) or {}
+        point["surface"] = meta.get("surface")
+        point["tournament"] = meta.get("tournament")
+        point["round"] = meta.get("round")
+        point["date"] = meta.get("date")
 
     return {"points": points, "match_count": len(matches)}

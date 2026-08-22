@@ -15,6 +15,12 @@ export default function Home() {
             >
               View ATP Matches
             </Link>
+            <Link
+              href="/progress"
+              className="flex h-11 w-full items-center justify-center rounded-lg border border-zinc-200 bg-white text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50"
+            >
+              Improvement tracker
+            </Link>
             <UploadComingSoonButton />
           </div>
         </div>

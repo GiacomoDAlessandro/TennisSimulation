@@ -9,11 +9,18 @@ export default function Header() {
           className="text-base font-semibold tracking-tight text-zinc-900 transition-opacity hover:opacity-70">
           Tennis Visualizer
         </Link>
-        <Link
-          href="/why"
-          className="text-base font-semibold tracking-tight text-zinc-900 transition-opacity hover:opacity-70">
-          About
-        </Link>
+        <div className="flex items-center gap-5">
+          <Link
+            href="/progress"
+            className="text-base font-semibold tracking-tight text-zinc-900 transition-opacity hover:opacity-70">
+            Progress
+          </Link>
+          <Link
+            href="/why"
+            className="text-base font-semibold tracking-tight text-zinc-900 transition-opacity hover:opacity-70">
+            About
+          </Link>
+        </div>
       </div>
     </header>
   );
