@@ -303,12 +303,17 @@ def get_player_serves_bulk(
 
     slot1_ids = []
     slot2_ids = []
-    surface_by_match = {}
+    meta_by_match = {}
     for m in matches:
         mid = m.get("match_id")
         if mid is None:
             continue
-        surface_by_match[mid] = m.get("surface")
+        meta_by_match[mid] = {
+            "surface": m.get("surface"),
+            "tournament": m.get("tournament"),
+            "round": m.get("round"),
+            "date": _match_date_from_id(mid),
+        }
         if m.get("player1") == player_name:
             slot1_ids.append(mid)
         else:
@@ -319,7 +324,11 @@ def get_player_serves_bulk(
     points = _fetch_points_for_slots(slot1_ids, slot2_ids)
 
     for point in points:
-        point["surface"] = surface_by_match.get(point.get("match_id"))
+        meta = meta_by_match.get(point.get("match_id")) or {}
+        point["surface"] = meta.get("surface")
+        point["tournament"] = meta.get("tournament")
+        point["round"] = meta.get("round")
+        point["date"] = meta.get("date")
 
     return {"points": points, "match_count": len(matches)}
 
