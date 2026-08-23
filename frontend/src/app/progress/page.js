@@ -3,6 +3,7 @@
 import {useEffect, useMemo, useState} from "react";
 import Header from "../components/header";
 import {API_BASE} from "../../lib/api";
+import {chunkIds, fetchServesChunk} from "../lib/fetchBulkServes";
 import {
     METRIC_OPTIONS,
     MIN_TREND_MATCHES,
@@ -146,16 +147,44 @@ export default function ProgressPage() {
         setLoading(true);
         setError(null);
         try {
-            const params = new URLSearchParams();
-            if (surface && surface !== "All") params.set("surface", surface);
-            const qs = params.toString() ? `?${params}` : "";
-            const res = await fetch(
-                `${API_BASE}/getPlayerServesBulk/${encodeURIComponent(player)}${qs}`
+            const surfaceParam = surface && surface !== "All" ? surface : null;
+            const matchQs = surfaceParam
+                ? `?surface=${encodeURIComponent(surfaceParam)}`
+                : "";
+            const matchRes = await fetch(
+                `${API_BASE}/getPlayerMatches/${encodeURIComponent(player)}${matchQs}`
             );
-            if (!res.ok) throw new Error(`Request failed (${res.status})`);
-            const data = await res.json();
-            setPoints(data.points ?? []);
+            if (!matchRes.ok) {
+                throw new Error(`Failed to load matches (${matchRes.status})`);
+            }
+            const matchData = await matchRes.json();
+            const matches = Array.isArray(matchData?.matches) ? matchData.matches : [];
+            const ids = matches.map((m) => m.match_id).filter((id) => id != null);
+            if (!ids.length) {
+                setPoints([]);
+                setLoadedName(player);
+                return;
+            }
+
+            const chunks = chunkIds(ids);
+            const allPoints = [];
+            let chunkFailed = false;
+            for (const chunk of chunks) {
+                try {
+                    const data = await fetchServesChunk(player, surfaceParam, chunk);
+                    allPoints.push(...data.points);
+                } catch {
+                    chunkFailed = true;
+                }
+            }
+            if (!allPoints.length) {
+                throw new Error("Failed to load serve points");
+            }
+            setPoints(allPoints);
             setLoadedName(player);
+            if (chunkFailed) {
+                setError("Some matches failed to load.");
+            }
         } catch (err) {
             setError(err.message || "Failed to load");
             setPoints([]);

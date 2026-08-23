@@ -29,7 +29,7 @@ app.add_middleware(
 )
 
 POINT_SELECT = (
-    "match_id, point_number, server, winner, score, set1, set2, game1, game2, "
+    "match_id, point_number, server, winner, game_number, score, set1, set2, game1, game2, "
     "first_serve_direction, first_serve_outcome, "
     "second_serve_direction, second_serve_outcome, point_end, had_fault"
 )
@@ -264,7 +264,7 @@ def get_match_points(match_id: str, player_name: str):
         return (
             supabase.table("points")
             .select(
-                "point_number, server, winner, score, set1, set2, game1, game2, "
+                "point_number, server, winner, game_number, score, set1, set2, game1, game2, "
                 "first_serve_direction, first_serve_outcome,"
                 "second_serve_direction, second_serve_outcome, point_end, had_fault"
             )
