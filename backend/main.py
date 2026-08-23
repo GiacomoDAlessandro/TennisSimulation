@@ -50,6 +50,15 @@ def _normalize_player_name(name: str) -> str:
     return re.sub(r"\s+", " ", (name or "").strip())
 
 
+def _match_date_from_id(match_id) -> Optional[str]:
+    """Parse ISO date from Tennis Abstract match_id (YYYYMMDD-M-Tournament-...)."""
+    prefix = str(match_id or "")[:8]
+    if len(prefix) == 8 and prefix.isdigit():
+        return f"{prefix[:4]}-{prefix[4:6]}-{prefix[6:8]}"
+    return None
+
+
+
 def _paginate_select(build_query, page_size: int = PAGE_SIZE) -> list:
     """Run a supabase query builder factory with .range() until exhausted."""
     all_rows: list = []
