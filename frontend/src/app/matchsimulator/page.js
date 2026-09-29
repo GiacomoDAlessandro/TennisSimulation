@@ -1,6 +1,7 @@
 "use client";
 import Header from "../components/header";
 import TennisCourt from "../components/TennisCourt";
+import PointReplay from "../components/PointReplay";
 import {useState, useEffect, useMemo, useRef} from "react";
 import OnePlayerBox from "../components/onePlayerBox";
 import TwoPlayerBox from "../components/TwoPlayerBox";
@@ -303,6 +304,8 @@ function PlayerPanel({
     pressureFilter,
     pointResultFilter,
     viewMode,
+    replayOpen,
+    onReplayOpenChange,
     showFiltersAboveCourt = false,
 }) {
     const [bulkPoints, setBulkPoints] = useState([]);
@@ -316,6 +319,10 @@ function PlayerPanel({
     const useBulkPoints = selectedMatchIds.length > 1;
     const singleSelectedMatchId =
         selectedMatchIds.length === 1 ? selectedMatchIds[0] : "";
+
+    useEffect(() => {
+        onReplayOpenChange(false);
+    }, [singleSelectedMatchId, onReplayOpenChange]);
 
     useEffect(() => {
         if (!name || selectedMatchIds.length <= 1) {
@@ -371,8 +378,7 @@ function PlayerPanel({
     const courtScale = 0.62;
     const skeletonW = STAGE_W * courtScale;
     const skeletonH = STAGE_H * courtScale;
-
-    return (
+    const controlsNode = (
         <div className="flex w-full flex-col gap-3">
             <MatchMultiSelect
                 items={matchOptions}
@@ -381,62 +387,74 @@ function PlayerPanel({
                 placeholder="Select matches"
                 emptyText="No matches found on this surface"
             />
-
-            {hasSelection && showFiltersAboveCourt ? filtersNode : null}
-
-            {hasSelection && selectedMatchIds.length > 1 && (
-                <div className="space-y-0.5 text-center text-xs text-zinc-500">
-                    <p>
-                        {bulkLoading
-                            ? `Loading serves… ${bulkChunksDone}/${bulkChunksTotal} batches`
-                            : `${serveCount} serve${serveCount === 1 ? "" : "s"} across ${bulkMatchCount} match${bulkMatchCount === 1 ? "" : "es"}`}
-                    </p>
-                    {bulkError ? (
-                        <p className="text-red-600">{bulkError}</p>
-                    ) : null}
+            {singleSelectedMatchId && (
+                <div className="inline-flex self-center rounded-lg border border-zinc-200 bg-zinc-100 p-0.5" role="group" aria-label="Court view">
+                    <button type="button" onClick={() => onReplayOpenChange(false)} aria-pressed={!replayOpen} className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${!replayOpen ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800"}`}>Serve map</button>
+                    <button type="button" onClick={() => onReplayOpenChange(true)} aria-pressed={replayOpen} className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${replayOpen ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800"}`}>Point replay</button>
                 </div>
             )}
+            {hasSelection && showFiltersAboveCourt && !replayOpen ? filtersNode : null}
+            {hasSelection && selectedMatchIds.length > 1 && (
+                <div className="space-y-0.5 text-center text-xs text-zinc-500">
+                    <p>{bulkLoading
+                        ? `Loading serves… ${bulkChunksDone}/${bulkChunksTotal} batches`
+                        : `${serveCount} serve${serveCount === 1 ? "" : "s"} across ${bulkMatchCount} match${bulkMatchCount === 1 ? "" : "es"}`}</p>
+                    {bulkError ? <p className="text-red-600">{bulkError}</p> : null}
+                </div>
+            )}
+        </div>
+    );
+    const playerLink = (
+        <h3 className="mb-2 text-sm font-semibold text-zinc-800">
+            <a href={getTennisAbstractPlayerUrl(name)} target="_blank" rel="noreferrer noopener" className="hover:text-zinc-900">{name}</a>
+        </h3>
+    );
+    const courtCard = (content) => (
+        <div className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            {playerLink}
+            {content}
+        </div>
+    );
+    const normalCourt = !hasSelection ? (
+        <p className="py-8 text-center text-sm text-zinc-500">Select a match to view serves.</p>
+    ) : showCourtSkeleton ? (
+        <div className="animate-pulse rounded-xl bg-zinc-200/80" style={{width: skeletonW, height: skeletonH}} aria-hidden/>
+    ) : (
+        <TennisCourt
+            surface={surface}
+            playerName={name}
+            matchId={useBulkPoints ? "" : singleSelectedMatchId}
+            points={useBulkPoints ? bulkPoints : null}
+            courtScale={courtScale}
+            viewMode={viewMode}
+            pointTypeFilter={pointTypeFilter}
+            serveOutcomeFilter={serveOutcomeFilter}
+            pressureFilter={pressureFilter}
+            pointResultFilter={pointResultFilter}
+        />
+    );
 
-            <div className="flex flex-col items-center rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <h3 className="mb-2 text-sm font-semibold text-zinc-800">
-                    <a
-                        href={getTennisAbstractPlayerUrl(name)}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="hover:text-zinc-900"
-                    >
-                        {name}
-                    </a>
-                </h3>
-                {!hasSelection ? (
-                    <p className="py-8 text-center text-sm text-zinc-500">
-                        Select a match to view serves.
-                    </p>
-                ) : showCourtSkeleton ? (
-                    <div
-                        className="animate-pulse rounded-xl bg-zinc-200/80"
-                        style={{width: skeletonW, height: skeletonH}}
-                        aria-hidden
-                    />
-                ) : (
-                    <TennisCourt
-                        surface={surface}
-                        playerName={name}
-                        matchId={useBulkPoints ? "" : singleSelectedMatchId}
-                        points={useBulkPoints ? bulkPoints : null}
-                        courtScale={courtScale}
-                        viewMode={viewMode}
-                        pointTypeFilter={pointTypeFilter}
-                        serveOutcomeFilter={serveOutcomeFilter}
-                        pressureFilter={pressureFilter}
-                        pointResultFilter={pointResultFilter}
-                    />
-                )}
-            </div>
-
-            {hasSelection && !showFiltersAboveCourt ? (
-                <div className="w-full">{filtersNode}</div>
-            ) : null}
+    return (
+        <div className="w-full">
+            {replayOpen && singleSelectedMatchId ? (
+                <PointReplay key={singleSelectedMatchId} matchId={singleSelectedMatchId} surface={surface}>
+                    {({court, summary}) => (
+                        <div className="flex w-full flex-col gap-3">
+                            {controlsNode}
+                            <div className="flex w-full flex-col items-center gap-4 xl:flex-row xl:items-start xl:justify-center">
+                                {courtCard(court)}
+                                {summary}
+                            </div>
+                        </div>
+                    )}
+                </PointReplay>
+            ) : (
+                <div className="flex w-full flex-col gap-3">
+                    {controlsNode}
+                    {courtCard(normalCourt)}
+                    {hasSelection && !showFiltersAboveCourt ? <div className="w-full">{filtersNode}</div> : null}
+                </div>
+            )}
         </div>
     );
 }
@@ -466,6 +484,8 @@ export default function MatchSimulatorPage() {
     const [selectedPressureFilter, setSelectedPressureFilter] = useState("all");
     const [selectedPointResultFilter, setSelectedPointResultFilter] = useState("all");
     const [viewMode, setViewMode] = useState("scatter");
+    const [replayOpenOne, setReplayOpenOne] = useState(false);
+    const [replayOpenTwo, setReplayOpenTwo] = useState(false);
 
     async function fetchPlayerMatches(playerName, surface, matchNum) {
         if (!playerName) return;
@@ -658,14 +678,14 @@ export default function MatchSimulatorPage() {
         <div className="flex min-h-screen flex-col bg-zinc-100 text-zinc-900">
             <Header/>
             <main className="flex flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-10">
-                <div
-                    className={`relative w-full flex-col min-h-[180px] gap-5 rounded-2xl border border-zinc-200/90 flex justify-center items-center bg-white p-4 shadow-sm sm:p-6 ${
-                        twoPlayers && tennisCourt
+                <div className={`relative w-full ${
+                            twoPlayers && tennisCourt
                             ? "max-w-[1180px]"
                             : onePlayer && tennisCourt
                                 ? "max-w-[640px]"
                                 : "max-w-[520px]"
                     }`}>
+                <div className="relative flex w-full min-h-[180px] flex-col items-center justify-center gap-5 rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm sm:p-6">
                     {clicked && (
                         <button
                             type="button"
@@ -738,8 +758,8 @@ export default function MatchSimulatorPage() {
                     )}
 
                     {(twoPlayers && tennisCourt) && (
-                        <div className="pt-6 grid w-full gap-5 md:grid-cols-2">
-                            {showSharedFilters && (
+                        <div className={`pt-6 grid w-full gap-5 ${replayOpenOne || replayOpenTwo ? "2xl:grid-cols-2" : "md:grid-cols-2"}`}>
+                            {showSharedFilters && !replayOpenOne && !replayOpenTwo && (
                                 <div className="col-span-full">
                                     {sharedFiltersNode}
                                 </div>
@@ -756,6 +776,8 @@ export default function MatchSimulatorPage() {
                                 pressureFilter={selectedPressureFilter}
                                 pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
+                                replayOpen={replayOpenOne}
+                                onReplayOpenChange={setReplayOpenOne}
                             />
                             <PlayerPanel
                                 name={selectedNameTwo}
@@ -769,6 +791,8 @@ export default function MatchSimulatorPage() {
                                 pressureFilter={selectedPressureFilter}
                                 pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
+                                replayOpen={replayOpenTwo}
+                                onReplayOpenChange={setReplayOpenTwo}
                             />
                         </div>
                     )}
@@ -793,7 +817,7 @@ export default function MatchSimulatorPage() {
                         />
                     )}
                     {onePlayer && tennisCourt && (
-                        <div className="flex w-full max-w-[600px] flex-col gap-3 pt-10 pb-10">
+                        <div className="flex w-full max-w-[640px] flex-col gap-3 pt-10 pb-10">
                             <PlayerPanel
                                 name={selectedNameOne}
                                 surface={selectedSurfaceOne}
@@ -807,9 +831,12 @@ export default function MatchSimulatorPage() {
                                 pressureFilter={selectedPressureFilter}
                                 pointResultFilter={selectedPointResultFilter}
                                 viewMode={viewMode}
+                                replayOpen={replayOpenOne}
+                                onReplayOpenChange={setReplayOpenOne}
                             />
                         </div>
                     )}
+                </div>
                 </div>
             </main>
         </div>

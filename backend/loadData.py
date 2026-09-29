@@ -85,6 +85,40 @@ def backfill_players_from_csv(matches_df=None):
     return success
 
 
+def backfill_match_handedness_from_csv(matches_df=None):
+    """Sync match metadata and dominant hands from the charting matches CSV."""
+    if matches_df is None:
+        matches_df = pd.read_csv(MATCHES_FILE)
+    matches_df = matches_df[matches_df["Surface"].isin(["Hard", "Clay", "Grass"])]
+
+    def hand_value(value):
+        if not isinstance(value, str):
+            return None
+        hand = value.strip().upper()
+        return hand if hand in {"R", "L"} else None
+
+    batch = []
+    for _, row in matches_df.iterrows():
+        batch.append({
+            "match_id": row["match_id"],
+            "player1": normalize_player_name(row["Player 1"]),
+            "player2": normalize_player_name(row["Player 2"]),
+            "surface": row["Surface"],
+            "tournament": clean(row.get("Tournament")),
+            "round": clean(row.get("Round")),
+            "player1_hand": hand_value(row.get("Pl 1 hand")),
+            "player2_hand": hand_value(row.get("Pl 2 hand")),
+        })
+
+    print(f"Syncing player handedness for {len(batch)} matches…")
+    success = True
+    for i in range(0, len(batch), BATCH_SIZE):
+        if not upsert_with_retry("matches", batch[i:i + BATCH_SIZE], on_conflict="match_id"):
+            success = False
+    print(f"{'✓' if success else '✗'} Match handedness sync {'done' if success else 'incomplete'}")
+    return success
+
+
 def backfill_players_from_supabase():
     """Re-sync players from existing matches rows in Supabase."""
     names = set()
@@ -299,7 +333,9 @@ def _run_load_pipeline():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] in ("--backfill-players", "backfill-players"):
+    if len(sys.argv) > 1 and sys.argv[1] in ("--backfill-player-hands", "backfill-player-hands"):
+        backfill_match_handedness_from_csv()
+    elif len(sys.argv) > 1 and sys.argv[1] in ("--backfill-players", "backfill-players"):
         # Prefer CSV (source of truth for names); fall back to Supabase scan.
         try:
             backfill_players_from_csv()

@@ -35,8 +35,12 @@ POINT_SELECT = (
 )
 
 MATCH_SELECT = "match_id, player1, player2, tournament, round, surface"
+REPLAY_MATCH_SELECT = f"{MATCH_SELECT}, player1_hand, player2_hand"
 PAGE_SIZE = 1000
 MATCH_ID_BATCH = 80
+REPLAY_POINT_SELECT = (
+    "match_id, point_number, server, winner, game_number, score, set1, set2, game1, game2, first, second"
+)
 
 
 def _normalize_surface(surface: str) -> str:
@@ -273,6 +277,39 @@ def get_match_points(match_id: str, player_name: str):
         )
 
     return {"points": _paginate_select(build)}
+
+
+@app.get("/getMatchPoints/{match_id}")
+def get_all_match_points(match_id: str):
+    """Return the complete charted point sequence (both servers) for replay."""
+    def _match_lookup(select_columns):
+        return (
+            supabase.table("matches")
+            .select(select_columns)
+            .eq("match_id", match_id)
+            .execute()
+        )
+
+    try:
+        match_result = execute_with_limit(lambda: _match_lookup(REPLAY_MATCH_SELECT))
+    except Exception as error:
+        # Keep replay available on databases before the optional handedness migration.
+        if "player1_hand" not in str(error) and "player2_hand" not in str(error):
+            raise
+        match_result = execute_with_limit(lambda: _match_lookup(MATCH_SELECT))
+    if not match_result.data:
+        return {"match": None, "points": []}
+    match = match_result.data[0]
+
+    def build_points():
+        return (
+            supabase.table("points")
+            .select(REPLAY_POINT_SELECT)
+            .eq("match_id", match_id)
+            .order("point_number")
+        )
+
+    return {"match": match, "points": _paginate_select(build_points)}
 
 
 @app.get("/getPlayerServesBulk/{player_name}")

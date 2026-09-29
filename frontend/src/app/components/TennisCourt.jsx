@@ -84,6 +84,8 @@ export default function TennisCourt({
                                         serveOutcomeFilter = "all",
                                         pressureFilter = "all",
                                         pointResultFilter = "all",
+                                        replayShots = null,
+                                        replayVisibleCount = 0,
                                     }) {
     const [mounted, setMounted] = useState(false);
     const [fitScale, setFitScale] = useState(0.72);
@@ -241,6 +243,7 @@ export default function TennisCourt({
         pressureFilter,
         pointResultFilter,
     };
+    const isReplay = Array.isArray(replayShots);
 
     return (
         <div className="relative flex flex-col items-center gap-2">
@@ -357,11 +360,43 @@ export default function TennisCourt({
                         </Group>
                     </Group>
                     </Layer>
-                    {viewMode === "scatter" && (
+                    {!isReplay && viewMode === "scatter" && (
                         <ShotLayer s={s} {...sharedShotProps} />
                     )}
+                    {isReplay && (
+                        <Layer scaleX={s} scaleY={s} listening={false}>
+                            {replayShots.slice(0, replayVisibleCount).map((shot, index) => (
+                                <React.Fragment key={`${shot.index}-${index}`}>
+                                    {shot.showPath && (
+                                        <Line
+                                            points={[shot.fromX + SIDE_PAD, shot.fromY, shot.x + SIDE_PAD, shot.y]}
+                                            stroke={index === replayVisibleCount - 1 ? "#fde047" : "#d4d4d8"}
+                                            strokeWidth={index === replayVisibleCount - 1 ? 4 : 2}
+                                            opacity={index === replayVisibleCount - 1 ? 0.95 : 0.26}
+                                            lineCap="round"
+                                            lineJoin="round"
+                                        />
+                                    )}
+                                    <Circle
+                                        x={shot.x + SIDE_PAD}
+                                        y={shot.y}
+                                        radius={index === replayVisibleCount - 1 ? 10 : 5}
+                                        fill={index === replayVisibleCount - 1
+                                            ? shot.kind === "serve" ? "#38bdf8" : "#facc15"
+                                            : shot.kind === "serve" ? "#bae6fd" : "#fef08a"}
+                                        opacity={index === replayVisibleCount - 1 ? 1 : 0.42}
+                                        stroke={index === replayVisibleCount - 1 ? "#ffffff" : "#a1a1aa"}
+                                        strokeWidth={index === replayVisibleCount - 1 ? 2 : 1}
+                                        shadowColor={index === replayVisibleCount - 1 ? "#facc15" : undefined}
+                                        shadowBlur={index === replayVisibleCount - 1 ? 16 : 0}
+                                        shadowOpacity={index === replayVisibleCount - 1 ? 0.85 : 0}
+                                    />
+                                </React.Fragment>
+                            ))}
+                        </Layer>
+                    )}
                 </Stage>
-                {viewMode === "heatmap" && (
+                {!isReplay && viewMode === "heatmap" && (
                     <ServeHeatmapLayer
                         width={stageW}
                         height={stageH}
@@ -370,7 +405,7 @@ export default function TennisCourt({
                     />
                 )}
             </div>
-            <div className="relative flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-700">
+            {!isReplay && <div className="relative flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-700">
                 {viewMode === "scatter" ? (
                     <>
                         <span
@@ -414,8 +449,8 @@ export default function TennisCourt({
                         {legendHover.label}: {legendHover.value}
                     </div>
                 )}
-            </div>
-            <ServeAnalyticsModal
+            </div>}
+            {!isReplay && <ServeAnalyticsModal
                 open={analyticsOpen}
                 onClose={() => setAnalyticsOpen(false)}
                 matchId={matchId}
@@ -426,7 +461,7 @@ export default function TennisCourt({
                 serveOutcomeFilter={serveOutcomeFilter}
                 pressureFilter={pressureFilter}
                 pointResultFilter={pointResultFilter}
-            />
+            />}
         </div>
     );
 }
