@@ -1,4 +1,4 @@
-import {getServeSide} from "./courtUtils";
+import {getServeSide} from "./courtUtils.js";
 
 const SHOT_TYPES = {
   f: "Forehand groundstroke", b: "Backhand groundstroke", r: "Forehand slice", s: "Backhand slice",
@@ -57,10 +57,19 @@ function parseSequence(raw, attempt) {
   while (text[index] === "c") { letCount += 1; index += 1; }
   const serveCode = text[index];
   if (SERVE_DIRECTIONS[serveCode]) {
+    if (letCount) {
+      for (let letIndex = 0; letIndex < letCount; letIndex += 1) {
+        shots.push({
+          kind: "serve", label: "Let serve", player: null,
+          direction: SERVE_DIRECTIONS[serveCode], directionCode: serveCode,
+          outcome: "Let", markers: ["Let"], attempt,
+        });
+      }
+    }
     const serve = {
       kind: "serve", label: `${attempt === 2 ? "Second" : "First"} serve`, player: null,
       direction: SERVE_DIRECTIONS[serveCode], directionCode: serveCode, outcome: null,
-      markers: letCount ? Array(letCount).fill("Let") : [], attempt,
+      markers: [], attempt,
     };
     index += 1;
     if (text[index] === "+") { serve.markers.push(MARKERS["+"]); index += 1; }
@@ -194,11 +203,24 @@ function sideAtStart(point) {
   return {nearSlot};
 }
 
-function serveCourtX(score, hitterNear, direction) {
-  const scores = String(score || "0-0").split("-");
-  const total = scores.reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0);
-  const serveSide = getServeSide(score);
-  const deuce = serveSide ? serveSide === "D" : total % 2 === 0;
+export function getPointServeSide(point) {
+  const score = String(point?.score || "0-0");
+  const isTiebreak = (Number(point?.game1) === 6 && Number(point?.game2) === 6)
+    || (Number(point?.game1) === 3 && Number(point?.game2) === 3);
+
+  if (!isTiebreak) return getServeSide(score) || "D";
+
+  // In a tiebreak, the first point is served from deuce; the side then
+  // alternates in pairs (ad, ad, deuce, deuce, ...).
+  const tiePoints = score.split("-").reduce((sum, value) => {
+    const parsed = Number(value);
+    return sum + (Number.isFinite(parsed) ? parsed : 0);
+  }, 0);
+  return tiePoints % 4 === 0 || tiePoints % 4 === 3 ? "D" : "A";
+}
+
+function serveCourtX(serveSide, hitterNear, direction) {
+  const deuce = serveSide === "D";
   // The diagonally opposite service box is left of center for a near-side
   // deuce serve and right of center for a near-side ad serve (reversed at the far end).
   const targetRight = deuce !== hitterNear;
@@ -213,14 +235,12 @@ function shotTarget(shot, point, previous, index, playerHands) {
   const hitterNear = Number(shot.player) === nearSlot;
   const targetNear = !hitterNear;
   if (shot.kind === "serve") {
-    const scores = String(point?.score || "0-0").split("-");
-    const scoreTotal = scores.reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0);
-    const serveSide = getServeSide(point?.score);
-    const deuce = serveSide ? serveSide === "D" : scoreTotal % 2 === 0;
+    const serveSide = getPointServeSide(point);
+    const deuce = serveSide === "D";
     const targetRight = deuce !== hitterNear;
     const minX = targetRight ? COURT.center + 2 : COURT.left + 2;
     const maxX = targetRight ? COURT.right - 2 : COURT.center - 2;
-    let x = serveCourtX(point?.score, hitterNear, shot.direction) + stableJitter(point, index, "serve-x", 20);
+    let x = serveCourtX(serveSide, hitterNear, shot.direction) + stableJitter(point, index, "serve-x", 20);
     let y = (hitterNear ? 325 : 545) + stableJitter(point, index, "serve-y", 20);
     const outcome = shot.outcome || "";
     if (outcome.includes("Net error")) y = COURT.net;
@@ -292,9 +312,14 @@ export function getReplayFrame(point, playerHands = []) {
     const target = shotTarget(shot, point, previous, index, playerHands);
     const {nearSlot} = sideAtStart(point);
     const servingNear = Number(point?.server) === nearSlot;
-    const serverPosition = {x: COURT.center, y: servingNear ? COURT.nearBase + 12 : COURT.farBase - 12};
+    const deuceServe = getPointServeSide(point) === "D";
+    const serverRight = deuceServe === servingNear;
+    const serverPosition = {
+      x: serverRight ? COURT.center + 48 : COURT.center - 48,
+      y: servingNear ? COURT.nearBase + 12 : COURT.farBase - 12,
+    };
     const missedServe = shot.kind === "serve" && Boolean(shot.outcome)
-      && !["Ace", "Unreturnable serve"].includes(shot.outcome);
+      && !["Ace", "Unreturnable serve", "Let"].includes(shot.outcome);
     const from = shot.kind === "serve" ? serverPosition : previous || serverPosition;
     const showPath = !missedServe && (shot.kind === "serve" || previous !== null);
     if (!missedServe) previous = target;

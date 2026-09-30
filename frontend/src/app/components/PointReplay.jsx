@@ -101,7 +101,7 @@ export default function PointReplay({matchId, surface = "hard", children}) {
   const revealed = replayFrame.shots.slice(0, visibleCount);
   const eventsVisible = visibleCount >= replayFrame.shots.length;
   const visibleServeFault = visibleShot?.kind === "serve" && visibleShot.outcome
-    && !["Ace", "Unreturnable serve"].includes(visibleShot.outcome);
+    && !["Ace", "Unreturnable serve", "Let"].includes(visibleShot.outcome);
   const isDoubleFault = visibleServeFault && visibleShot.attempt === 2
     && Number(point.winner) !== Number(point.server)
     && !replayFrame.shots.some((shot) => shot.kind === "rally");

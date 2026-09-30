@@ -89,11 +89,11 @@ export const SERVE_COLORS = {
 }
 
 const SCORE_TO_SIDE = {
-    "0-0": "D", "15-0": "D", "30-0": "D", "40-0": "D",
-    "0-15": "A", "15-15": "A", "30-15": "A", "40-15": "A",
-    "0-30": "D", "15-30": "D", "30-30": "D", "40-30": "D",
-    "0-40": "A", "15-40": "A", "30-40": "A", "40-40": "D",
-    "AD-40": "D", "40-AD": "A",
+    "0-0": "D", "15-0": "A", "30-0": "D", "40-0": "A",
+    "0-15": "A", "15-15": "D", "30-15": "A", "40-15": "D",
+    "0-30": "D", "15-30": "A", "30-30": "D", "40-30": "A",
+    "0-40": "A", "15-40": "D", "30-40": "A", "40-40": "D",
+    "AD-40": "A", "40-AD": "A",
 }
 
 const jitter = (range) => (Math.random() - 0.5) * range;
@@ -161,5 +161,3 @@ export function getServeCoordinates(score, first_direction, first_outcome, secon
 
     return shots;
 }
-
-
