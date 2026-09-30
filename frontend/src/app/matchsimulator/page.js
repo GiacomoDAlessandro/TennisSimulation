@@ -2,7 +2,8 @@
 import Header from "../components/header";
 import TennisCourt from "../components/TennisCourt";
 import PointReplay from "../components/PointReplay";
-import {useState, useEffect, useMemo, useRef} from "react";
+import MatchAnalytics from "../components/MatchAnalytics";
+import {useState, useEffect, useMemo, useRef, useCallback} from "react";
 import OnePlayerBox from "../components/onePlayerBox";
 import TwoPlayerBox from "../components/TwoPlayerBox";
 import { API_BASE } from "../../lib/api";
@@ -306,6 +307,7 @@ function PlayerPanel({
     viewMode,
     replayOpen,
     onReplayOpenChange,
+    onReplayProgress,
     showFiltersAboveCourt = false,
 }) {
     const [bulkPoints, setBulkPoints] = useState([]);
@@ -437,7 +439,7 @@ function PlayerPanel({
     return (
         <div className="w-full">
             {replayOpen && singleSelectedMatchId ? (
-                <PointReplay key={singleSelectedMatchId} matchId={singleSelectedMatchId} surface={surface}>
+                <PointReplay key={singleSelectedMatchId} matchId={singleSelectedMatchId} surface={surface} onReplayProgress={onReplayProgress}>
                     {({court, summary}) => (
                         <div className="flex w-full flex-col gap-3">
                             {controlsNode}
@@ -486,6 +488,10 @@ export default function MatchSimulatorPage() {
     const [viewMode, setViewMode] = useState("scatter");
     const [replayOpenOne, setReplayOpenOne] = useState(false);
     const [replayOpenTwo, setReplayOpenTwo] = useState(false);
+    const [replayAnalyticsOne, setReplayAnalyticsOne] = useState(null);
+    const [replayAnalyticsTwo, setReplayAnalyticsTwo] = useState(null);
+    const updateReplayAnalyticsOne = useCallback((snapshot) => setReplayAnalyticsOne(snapshot), []);
+    const updateReplayAnalyticsTwo = useCallback((snapshot) => setReplayAnalyticsTwo(snapshot), []);
 
     async function fetchPlayerMatches(playerName, surface, matchNum) {
         if (!playerName) return;
@@ -673,19 +679,35 @@ export default function MatchSimulatorPage() {
     const showSharedFilters =
         (onePlayer && selectedMatchIdsOne.length > 0) ||
         (twoPlayers && (selectedMatchIdsOne.length > 0 || selectedMatchIdsTwo.length > 0));
+    const showReplayAnalyticsOne = onePlayer && tennisCourt && replayOpenOne && selectedMatchIdsOne.length === 1;
+    const showReplayAnalyticsTwo = twoPlayers && tennisCourt && replayOpenTwo && selectedMatchIdsTwo.length === 1;
+    const hasReplayAnalytics = showReplayAnalyticsOne || showReplayAnalyticsTwo;
+    const analyticsLayoutClass = hasReplayAnalytics
+        ? twoPlayers ? "min-[1600px]:flex-row min-[1600px]:items-start" : "xl:flex-row xl:items-start"
+        : "";
+    const analyticsViews = [
+        showReplayAnalyticsOne ? {
+            key: selectedMatchIdsOne[0],
+            snapshot: replayAnalyticsOne?.matchId === selectedMatchIdsOne[0] ? replayAnalyticsOne : null,
+        } : null,
+        showReplayAnalyticsTwo ? {
+            key: selectedMatchIdsTwo[0],
+            snapshot: replayAnalyticsTwo?.matchId === selectedMatchIdsTwo[0] ? replayAnalyticsTwo : null,
+        } : null,
+    ].filter(Boolean);
 
     return (
         <div className="flex min-h-screen flex-col bg-zinc-100 text-zinc-900">
             <Header/>
             <main className="flex flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-10">
-                <div className={`relative w-full ${
+                <div className={`relative flex w-full flex-col items-center gap-5 ${analyticsLayoutClass} ${hasReplayAnalytics ? "xl:justify-center" : ""} ${
                             twoPlayers && tennisCourt
-                            ? "max-w-[1180px]"
+                            ? hasReplayAnalytics ? "max-w-[1540px]" : "max-w-[1180px]"
                             : onePlayer && tennisCourt
-                                ? "max-w-[640px]"
+                                ? hasReplayAnalytics ? "max-w-[1040px]" : "max-w-[640px]"
                                 : "max-w-[520px]"
                     }`}>
-                <div className="relative flex w-full min-h-[180px] flex-col items-center justify-center gap-5 rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm sm:p-6">
+                <div className={`relative flex w-full min-w-0 min-h-[180px] flex-col items-center justify-center gap-5 rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm sm:p-6 ${hasReplayAnalytics && onePlayer ? "xl:w-[660px] xl:flex-none" : hasReplayAnalytics && twoPlayers ? "min-[1600px]:w-[1180px] min-[1600px]:flex-none" : ""}`}>
                     {clicked && (
                         <button
                             type="button"
@@ -778,6 +800,7 @@ export default function MatchSimulatorPage() {
                                 viewMode={viewMode}
                                 replayOpen={replayOpenOne}
                                 onReplayOpenChange={setReplayOpenOne}
+                                onReplayProgress={updateReplayAnalyticsOne}
                             />
                             <PlayerPanel
                                 name={selectedNameTwo}
@@ -793,6 +816,7 @@ export default function MatchSimulatorPage() {
                                 viewMode={viewMode}
                                 replayOpen={replayOpenTwo}
                                 onReplayOpenChange={setReplayOpenTwo}
+                                onReplayProgress={updateReplayAnalyticsTwo}
                             />
                         </div>
                     )}
@@ -833,10 +857,12 @@ export default function MatchSimulatorPage() {
                                 viewMode={viewMode}
                                 replayOpen={replayOpenOne}
                                 onReplayOpenChange={setReplayOpenOne}
+                                onReplayProgress={updateReplayAnalyticsOne}
                             />
                         </div>
                     )}
                 </div>
+                {analyticsViews.map(({key, snapshot}) => <MatchAnalytics key={key} snapshot={snapshot}/>) }
                 </div>
             </main>
         </div>

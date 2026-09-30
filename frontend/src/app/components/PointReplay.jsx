@@ -6,7 +6,7 @@ import {API_BASE} from "../../lib/api";
 import {formatPointScore, getReplayFrame} from "../lib/pointReplay";
 import {STAGE_H, STAGE_W} from "../lib/courtConstants";
 
-export default function PointReplay({matchId, surface = "hard", children}) {
+export default function PointReplay({matchId, surface = "hard", children, onReplayProgress}) {
   const [points, setPoints] = useState([]);
   const [match, setMatch] = useState(null);
   const [pointIndex, setPointIndex] = useState(0);
@@ -44,6 +44,15 @@ export default function PointReplay({matchId, surface = "hard", children}) {
     [point, playerHands]
   );
   const visibleShot = replayFrame.shots[visibleCount - 1] ?? null;
+  const completedPointCount = Math.min(points.length, pointIndex + (
+    visibleCount >= replayFrame.shots.length && (replayFrame.shots.length > 0 || replayFrame.events.length > 0) ? 1 : 0
+  ));
+
+  useEffect(() => {
+    if (match && onReplayProgress) {
+      onReplayProgress({matchId, match, points, completedPointCount});
+    }
+  }, [matchId, match, points, completedPointCount, onReplayProgress]);
 
   useEffect(() => {
     latestShotRef.current?.scrollIntoView({block: "nearest", behavior: "smooth"});
